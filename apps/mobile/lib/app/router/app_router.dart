@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/application/providers/auth_provider.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/history/presentation/screens/history_detail_screen.dart';
@@ -16,10 +17,36 @@ import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
 import 'route_names.dart';
 
+const _publicRoutes = {
+  RouteNames.splash,
+  RouteNames.onboarding,
+  RouteNames.login,
+  RouteNames.register,
+};
+
 final routerProvider = Provider<GoRouter>((ref) {
+  // Watching authProvider causes routerProvider to rebuild — and GoRouter to
+  // re-evaluate redirect — whenever auth state changes.
+  ref.watch(authProvider);
+
   return GoRouter(
     initialLocation: RouteNames.splash,
     debugLogDiagnostics: true,
+    redirect: (context, state) {
+      // ref.read is intentional: the outer ref.watch above is the reactive
+      // trigger. Using ref.watch here would cause an infinite rebuild loop.
+      final authStatus = ref.read(authProvider).valueOrNull?.status;
+      final isPublic = _publicRoutes.contains(state.matchedLocation);
+
+      if (authStatus == null || authStatus == AuthStatus.unknown) return null;
+      if (authStatus == AuthStatus.unauthenticated && !isPublic) {
+        return RouteNames.login;
+      }
+      if (authStatus == AuthStatus.authenticated && isPublic) {
+        return RouteNames.home;
+      }
+      return null;
+    },
     routes: [
       GoRoute(
         path: RouteNames.splash,
