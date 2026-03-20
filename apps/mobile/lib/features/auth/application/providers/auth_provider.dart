@@ -1,6 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/services/storage_service.dart';
+import '../../data/repositories/firebase_auth_repository.dart';
+import '../../domain/entities/user_entity.dart';
+import '../../domain/repositories/auth_repository.dart';
+
+// ─── Repository provider ──────────────────────────────────────────────────────
+
+final authRepositoryProvider = Provider<AuthRepository>(
+  (ref) => FirebaseAuthRepository(),
+);
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -10,13 +18,13 @@ class AuthState {
   const AuthState({
     this.status = AuthStatus.unknown,
     this.userId,
-    this.accessToken,
+    this.user,
     this.error,
   });
 
   final AuthStatus status;
   final String? userId;
-  final String? accessToken;
+  final UserEntity? user;
   final String? error;
 
   bool get isAuthenticated => status == AuthStatus.authenticated;
@@ -24,64 +32,61 @@ class AuthState {
   AuthState copyWith({
     AuthStatus? status,
     String? userId,
-    String? accessToken,
+    UserEntity? user,
     String? error,
   }) =>
       AuthState(
         status: status ?? this.status,
         userId: userId ?? this.userId,
-        accessToken: accessToken ?? this.accessToken,
+        user: user ?? this.user,
         error: error,
       );
 }
 
 // ─── Notifier ────────────────────────────────────────────────────────────────
 
-class AuthNotifier extends AsyncNotifier<AuthState> {
+class AuthNotifier extends StreamNotifier<AuthState> {
   @override
-  Future<AuthState> build() async {
-    return _checkSession();
-  }
-
-  Future<AuthState> _checkSession() async {
-    final token = await StorageService.instance.getAccessToken();
-    final userId = await StorageService.instance.getUserId();
-    if (token != null && userId != null) {
+  Stream<AuthState> build() {
+    return ref.watch(authRepositoryProvider).authStateChanges().map((firebaseUser) {
+      if (firebaseUser == null) {
+        return const AuthState(status: AuthStatus.unauthenticated);
+      }
       return AuthState(
         status: AuthStatus.authenticated,
-        userId: userId,
-        accessToken: token,
-      );
-    }
-    return const AuthState(status: AuthStatus.unauthenticated);
-  }
-
-  /// Sign in with email and password.
-  /// TODO: wire to AuthRepository once implemented.
-  Future<void> signIn({required String email, required String password}) async {
-    state = const AsyncValue.loading();
-    try {
-      // Placeholder — real implementation will call AuthRepository
-      await Future<void>.delayed(const Duration(milliseconds: 800));
-      await StorageService.instance.setAccessToken('placeholder_token');
-      await StorageService.instance.setUserId('placeholder_user_id');
-      state = const AsyncValue.data(
-        AuthState(
-          status: AuthStatus.authenticated,
-          userId: 'placeholder_user_id',
-          accessToken: 'placeholder_token',
+        userId: firebaseUser.uid,
+        user: UserEntity(
+          id: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          avatarUrl: firebaseUser.avatarUrl,
         ),
       );
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    });
+  }
+
+  Future<void> signIn({required String email, required String password}) async {
+    await ref.read(authRepositoryProvider).signInWithEmail(
+          email: email,
+          password: password,
+        );
+    // authStateChanges() stream updates state automatically
+  }
+
+  Future<void> register({required String email, required String password}) async {
+    await ref.read(authRepositoryProvider).registerWithEmail(
+          email: email,
+          password: password,
+        );
+  }
+
+  Future<void> signInWithGoogle() async {
+    await ref.read(authRepositoryProvider).signInWithGoogle();
   }
 
   Future<void> signOut() async {
-    state = const AsyncValue.loading();
-    await StorageService.instance.clearTokens();
-    state = const AsyncValue.data(AuthState(status: AuthStatus.unauthenticated));
+    await ref.read(authRepositoryProvider).signOut();
   }
 }
 
-final authProvider = AsyncNotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
+final authProvider = StreamNotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
