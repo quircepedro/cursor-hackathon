@@ -1,0 +1,154 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum RecordingStatus {
+  PENDING
+  UPLOADING
+  TRANSCRIBING
+  ANALYZING
+  GENERATING_CLIP
+  COMPLETE
+  FAILED
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+// Models
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  displayName String
+  profilePicture String?
+  bio       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recordings    Recording[]
+  notifications Notification[]
+  refreshTokens RefreshToken[]
+
+  @@index([email])
+  @@index([createdAt])
+}
+
+model Recording {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  audioUrl    String
+  duration    Int // in milliseconds
+  status      RecordingStatus @default(PENDING)
+  mood        String?
+  energyLevel Int? // 1-10 scale
+
+  transcription Transcription?
+  insight       Insight?
+  clip          Clip?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([status])
+}
+
+model Transcription {
+  id        String   @id @default(cuid())
+  recordingId String @unique
+  recording Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+
+  text       String
+  language   String @default("en")
+  confidence Float? // 0-1 scale
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([recordingId])
+}
+
+model Insight {
+  id        String   @id @default(cuid())
+  recordingId String @unique
+  recording Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+
+  summary        String
+  emotionScores  Json // { joy: 0.8, sadness: 0.2, anger: 0.1, ... }
+  keyThemes      Json // ["theme1", "theme2", ...]
+  suggestedActions Json? // [{ action: "...", priority: "high" }, ...]
+  sentiment      String // POSITIVE, NEUTRAL, NEGATIVE
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([recordingId])
+}
+
+model Clip {
+  id        String   @id @default(cuid())
+  recordingId String @unique
+  recording Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+
+  videoUrl  String
+  duration  Int // in milliseconds
+  thumbnail String?
+  sceneStart Int // timestamp in milliseconds
+  sceneEnd   Int // timestamp in milliseconds
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([recordingId])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  token     String @unique
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title     String
+  message   String
+  type      String // "RECORDING_COMPLETE", "INSIGHT_READY", "CLIP_GENERATED", etc.
+  read      Boolean @default(false)
+  link      String? // Deep link to relevant content
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([read])
+}

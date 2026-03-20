@@ -9,6 +9,7 @@ module.exports = {
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
   ],
+  ignorePatterns: ['apps/backend/**', 'apps/mobile/**', 'dist/**', 'coverage/**'],
   env: {
     node: true,
     es6: true,
