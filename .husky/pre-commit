@@ -1,0 +1,9 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+npx lint-staged
+
+# Run Flutter analysis if Flutter packages exist
+if [ -d "apps/mobile" ]; then
+  melos run analyze --no-select || true
+fi

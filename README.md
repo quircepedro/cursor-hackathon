@@ -1,139 +1,316 @@
-# Cursor Hackathon · IE University · March 2026
+# Votio
 
-**Organized by TechIE x Building and Tech · Sponsored by Cursor**
+Voice journaling with AI analysis and visual clip generation.
 
-## 1. Overview
+## Overview
 
-This repository is your starting point for the hackathon.
+Votio transforms voice journals into visual insights:
 
-Your flow is simple.
+1. **Record** — User records a voice journal entry
+2. **Transcribe** — Audio is converted to text
+3. **Analyze** — AI extracts emotional insights and themes
+4. **Generate** — A short visual clip is composed based on mood and themes
+5. **Display** — User sees the clip with insights and summary
 
-1. Clone this repo
-2. Build your project during the event
-3. Deploy it on Vercel
-4. Submit it through the Google Form
-5. Present it live
+## Architecture
 
-This repo is here to help you move quickly from idea to deployment.
+This is a **monorepo** with two primary applications:
 
-## 2. The Challenge
+- **Mobile (`apps/mobile`)** — Flutter cross-platform app (iOS, Android)
+- **Backend (`apps/backend`)** — NestJS API with async processing pipeline
 
-**Make one person’s hard day easier.**
+## Stack
 
-This challenge is intentionally open to interpretation.
+| Concern      | Choice                       |
+| ------------ | ---------------------------- |
+| Backend      | NestJS (TypeScript)          |
+| Database     | PostgreSQL + Prisma ORM      |
+| Queue / Jobs | Bull + Redis                 |
+| Mobile       | Flutter + Riverpod           |
+| State        | Riverpod v2 (code-generated) |
+| Navigation   | GoRouter                     |
+| HTTP         | Dio + Retrofit               |
+| Storage      | S3-compatible abstraction    |
 
-You are not being asked to build one specific type of product. You are being asked to identify a real person, understand what makes their day difficult, and build something that helps in a meaningful way.
+## Getting Started
 
-The strongest projects will be grounded in a real situation, focused in scope, and clear in their usefulness.
+### Prerequisites
 
-Read the full brief and rubric in [CHALLENGE.md](./CHALLENGE.md).
+- **Node.js** ≥ 18
+- **Flutter** ≥ 3.3 with Dart
+- **Docker** and **Docker Compose** (for local services: PostgreSQL, Redis)
+- **Git**
 
-## 3. Who Can Participate
-
-1. Solo participants or teams of up to 4
-2. No technical background required
-3. All participants receive Cursor credits
-
-You do not need to be an experienced developer to participate. If you can clearly describe what should exist, you can use this hackathon to build it.
-
-## 4. Rules
-
-1. Your project must be built during the event
-2. Your project must be deployed on Vercel
-3. Your final submission must include a live link
-4. Teams may have up to 4 people
-5. Solo participation is allowed
-
-## 5. Evaluation Rubric
-
-Projects will be evaluated based on the rubric in [CHALLENGE.md](./CHALLENGE.md), with particular attention to the following areas:
-
-1. Understanding of the person and problem
-2. Relevance and usefulness
-3. Quality of execution
-4. Creativity and interpretation
-5. Use of tools to extend what was possible
-6. Presentation and storytelling
-
-## 6. How to Use This Repo
-
-### 6.1 Clone the repository
+### 1. Install Dependencies
 
 ```bash
-git clone <YOUR_REPO_URL>
-cd <YOUR_REPO_NAME>
-```
-
-### 6.2 Build your project
-
-Use this starter however you want. You can adapt it, replace it, or extend it to match your idea.
-
-Your goal is to create a project that clearly demonstrates your solution and can be accessed through a live URL.
-
-### 6.3 Run locally
-
-Install dependencies and start the development server:
-
-```bash
+# Install root-level npm packages (linting, formatting, commit hooks)
 npm install
-npm run dev
+
+# Install Flutter dependencies
+cd apps/mobile
+flutter pub get
+
+# Install backend dependencies
+cd ../backend
+npm install
 ```
 
-### 6.4 Deploy to Vercel
-
-Your final project must be live on Vercel.
-
-A typical deployment flow looks like this:
+### 2. Start Local Services
 
 ```bash
-npx vercel
+# From repo root, start Postgres + Redis in containers
+docker-compose up -d
+
+# Verify services are healthy
+docker-compose ps
 ```
 
-You can also connect your GitHub repository directly to Vercel and deploy from there.
+### 3. Initialize Backend Database
 
-Before submitting, make sure the deployment link works, the project loads correctly, and the core functionality is accessible to judges.
+```bash
+cd apps/backend
 
-## 7. Submission
+# Copy environment file
+cp .env.example .env
 
-Once your project is deployed, submit it through the Google Form:
+# Run database migrations
+npm run prisma:migrate
 
-**[Submit here](https://forms.gle/dS1H98eJoZwsXj7e7).**
+# (Optional) Seed with test data
+npm run prisma:seed
+```
 
-Your submission should include the following:
+### 4. Start Backend
 
-1. Team name
-2. Team members
-3. Project title
-4. Short description
-5. Deployed Vercel link
+```bash
+cd apps/backend
+npm run dev
 
-Only submitted projects with a working deployed link will be considered.
+# Backend runs on http://localhost:3000
+# Swagger docs at http://localhost:3000/api/docs
+```
 
-## 8. Presentation
+### 5. Start Mobile App
 
-After submitting, your team will present the project live.
+```bash
+cd apps/mobile
 
-Your presentation should clearly communicate four things:
+# Run on development flavor (recommended for development)
+flutter run --flavor development --dart-define=FLAVOR=development
 
-1. Who you built for
-2. What problem you identified
-3. What you built
-4. Why your solution makes that person’s day easier
+# Or build APK for testing
+flutter build apk --debug --flavor development
+```
 
-This is not only about showing features. It is also about showing your reasoning, your interpretation of the challenge, and the story behind the project.
+## Project Structure
 
-## 9. Included Resources
+```
+votio/
+├── apps/
+│   ├── mobile/          # Flutter app
+│   └── backend/         # NestJS API
+├── packages/            # Shared packages (future)
+├── docs/                # Architecture & development docs
+├── scripts/             # Utility scripts
+├── environments/        # Environment config templates
+└── docker-compose.yml   # Local services
+```
 
-1. [Challenge brief and rubric](./CHALLENGE.md)
-2. [Practical tips](./resources/tips.md)
-3. [Starter project](./starter/)
+## Development Workflows
 
-## 10. Final Reminder
+### Code Quality
 
-Build something focused.
+**Lint TypeScript:**
 
-Deploy it.
+```bash
+npm run lint
+```
 
-Submit the live link.
+**Format all files:**
 
-Then tell the story of why it matters.
+```bash
+npm run format
+```
+
+**Type check backend:**
+
+```bash
+npm run type-check
+```
+
+**Lint Flutter:**
+
+```bash
+cd apps/mobile
+melos run analyze
+```
+
+### Testing
+
+**Backend unit tests:**
+
+```bash
+cd apps/backend
+npm run test
+```
+
+**Flutter tests:**
+
+```bash
+cd apps/mobile
+melos run test
+```
+
+### Database
+
+**Create a new migration:**
+
+```bash
+cd apps/backend
+npm run prisma:migrate -- --name your_migration_name
+```
+
+**Open Prisma Studio:**
+
+```bash
+cd apps/backend
+npm run prisma:studio
+```
+
+## Commit Convention
+
+This repo enforces **Conventional Commits** via `commitlint`:
+
+```
+type(scope): short description
+
+Optional longer description here.
+
+Closes #123
+```
+
+**Types:** `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
+
+**Scopes:** `mobile`, `backend`, `auth`, `audio`, `transcription`, `analysis`, `clips`, `history`, `subscriptions`, `notifications`, `infra`, `docs`, `ci`, `deps`, `config`
+
+Example:
+
+```bash
+git commit -m "feat(recording): add waveform visualization widget"
+git commit -m "fix(backend): handle malformed audio uploads gracefully"
+```
+
+## Environment Configuration
+
+Sensitive configuration is managed via `.env` files (gitignored):
+
+**Backend (apps/backend/.env):**
+
+```bash
+DATABASE_URL=postgresql://votio:votio_local@localhost:5432/votio_dev
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=your-secret-key
+NODE_ENV=development
+```
+
+**Mobile (apps/mobile/.env.development):**
+
+```bash
+API_BASE_URL=http://localhost:3000
+API_TIMEOUT_MS=30000
+```
+
+See `.env.example` files for the full list of required variables.
+
+## Architecture Decisions
+
+Detailed rationale for technology and pattern choices:
+
+- **[ADR-001: Backend Framework](docs/decisions/ADR-001-backend-framework.md)** — Why NestJS over FastAPI
+- **[ADR-002: State Management](docs/decisions/ADR-002-state-management.md)** — Why Riverpod over Bloc
+- **[ADR-003: Audio Pipeline](docs/decisions/ADR-003-audio-pipeline.md)** — State machine for async processing
+
+## Documentation
+
+- **[Architecture Overview](docs/architecture/overview.md)** — System design and components
+- **[Backend Architecture](docs/architecture/backend.md)** — NestJS module structure
+- **[Mobile Architecture](docs/architecture/mobile.md)** — Flutter feature structure
+- **[Data Flow](docs/architecture/data-flow.md)** — Audio pipeline state machine
+- **[Environment Setup](docs/development/environment-setup.md)** — Detailed setup guide
+- **[Contributing](docs/development/contributing.md)** — Development guidelines
+
+## Troubleshooting
+
+### `docker-compose up` fails
+
+**Check Docker is running:**
+
+```bash
+docker ps
+```
+
+**View logs:**
+
+```bash
+docker-compose logs postgres
+docker-compose logs redis
+```
+
+### Backend won't start
+
+**Verify Postgres is running and healthy:**
+
+```bash
+docker-compose ps postgres
+```
+
+**Check DATABASE_URL in .env:**
+
+```bash
+cd apps/backend
+cat .env | grep DATABASE_URL
+```
+
+**Verify migrations applied:**
+
+```bash
+npm run prisma:generate
+npm run prisma:migrate
+```
+
+### Flutter build fails
+
+**Clean build cache:**
+
+```bash
+cd apps/mobile
+flutter clean
+flutter pub get
+melos run build_runner
+```
+
+**Verify analyze passes:**
+
+```bash
+melos run analyze
+```
+
+## Next Steps
+
+This setup is infrastructure-only. To begin feature development:
+
+1. **Implement authentication** — Backend auth endpoints + Flutter auth flow
+2. **Implement audio upload** — Multipart upload + local storage
+3. **Wire the recording flow** — Flutter recording screen + backend pipeline
+4. **Add third-party integrations** — Whisper, OpenAI, clip generation service
+
+See [What's Left After Setup](docs/development/getting-started.md#whats-left) for the full roadmap.
+
+## License
+
+TBD
+
+## Support
+
+For issues or questions, file a GitHub issue or reach out to the team.

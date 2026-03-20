@@ -1,0 +1,45 @@
+{
+  "name": "votio-monorepo",
+  "version": "1.0.0",
+  "description": "Voice journaling with AI analysis and visual clip generation",
+  "private": true,
+  "workspaces": [
+    "apps/backend",
+    "packages/*"
+  ],
+  "scripts": {
+    "backend:dev": "npm run dev --workspace=apps/backend",
+    "backend:build": "npm run build --workspace=apps/backend",
+    "backend:test": "npm run test --workspace=apps/backend",
+    "backend:lint": "npm run lint --workspace=apps/backend",
+    "backend:type-check": "npm run type-check --workspace=apps/backend",
+    "lint": "eslint . --ext .ts,.js --ignore-pattern 'apps/mobile/**' --ignore-pattern 'dist/**'",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky install",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "db:migrate": "npm run prisma:migrate --workspace=apps/backend",
+    "db:generate": "npm run prisma:generate --workspace=apps/backend",
+    "db:seed": "npm run prisma:seed --workspace=apps/backend",
+    "type-check": "tsc --noEmit --skipLibCheck -p apps/backend/tsconfig.json",
+    "clean": "bash scripts/clean.sh",
+    "check-env": "bash scripts/check-env.sh"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^9.0.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

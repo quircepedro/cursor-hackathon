@@ -1,0 +1,41 @@
+name: votio
+
+packages:
+  - apps/mobile
+
+scripts:
+  analyze:
+    run: flutter analyze
+    description: Run Flutter analyzer
+    exec:
+      concurrency: 1
+
+  test:
+    run: flutter test
+    description: Run Flutter tests
+    exec:
+      concurrency: 1
+
+  build_runner:
+    run: dart run build_runner build --delete-conflicting-outputs
+    description: Generate Dart code
+    exec:
+      concurrency: 1
+
+  format:
+    run: dart format . --line-length 100
+    description: Format Dart code
+    exec:
+      concurrency: 1
+
+  clean:
+    run: flutter clean
+    description: Clean Flutter builds
+    exec:
+      concurrency: 1
+
+  pub_get:
+    run: flutter pub get
+    description: Get Flutter dependencies
+    exec:
+      concurrency: 1

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+coverage/
+.next/
+out/
+*.pem
+*.key
+.env
+.env.local
+*.lock
+*.iml
