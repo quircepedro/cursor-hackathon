@@ -62,9 +62,15 @@ model User {
   recordings     Recording[]
   notifications  Notification[]
 
-  @@index([providerUid])
+  @@index([createdAt])
 }
 ```
+
+Notes:
+
+- `providerUid @unique` implicitly creates a Postgres B-tree index — no additional `@@index([providerUid])` needed
+- `@@index([createdAt])` is retained for user listing/pagination queries
+- `@@index([email])` is removed — email is not a lookup key
 
 ### Removed
 
@@ -81,6 +87,12 @@ model User {
 
 ## 4. Backend — NestJS
 
+### New dependency
+
+```bash
+npm install firebase-admin --workspace=apps/backend
+```
+
 ### New files
 
 ```
@@ -96,26 +108,37 @@ src/
 
 ### Modified files
 
-| File                                      | Change                                                         |
-| ----------------------------------------- | -------------------------------------------------------------- |
-| `prisma/schema.prisma`                    | Remove password + RefreshToken; add providerUid, emailVerified |
-| `modules/users/services/users.service.ts` | Add findOrCreateFromFirebase()                                 |
-| `modules/users/users.module.ts`           | Export UsersService                                            |
-| `modules/auth/auth.module.ts`             | Import FirebaseModule, UsersModule; register guard             |
-| `app.module.ts`                           | Import FirebaseModule                                          |
-| `.env.example`                            | Add Firebase Admin env vars                                    |
+| File                                          | Change                                                                                      |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `prisma/schema.prisma`                        | Remove password + RefreshToken; update User model as above                                  |
+| `config/jwt.config.ts`                        | **Delete entirely** — JWT is no longer issued by this backend                               |
+| `config/configuration.ts`                     | Remove `import jwtConfig` and remove `jwt: jwtConfig()` from the aggregated config          |
+| `package.json` (backend)                      | Remove `@nestjs/jwt`, `@nestjs/passport`, `passport`, `passport-jwt`, `@types/passport-jwt` |
+| `modules/users/services/users.service.ts`     | Add `findOrCreateFromFirebase()`                                                            |
+| `modules/users/users.module.ts`               | Export UsersService                                                                         |
+| `modules/auth/auth.module.ts`                 | Import FirebaseModule, UsersModule; register FirebaseAuthGuard as exported guard            |
+| `modules/auth/controllers/auth.controller.ts` | No change — keep existing health endpoint                                                   |
+| `modules/auth/services/auth.service.ts`       | No change                                                                                   |
+| `app.module.ts`                               | Import FirebaseModule                                                                       |
+| `.env.example`                                | Remove JWT vars; add Firebase Admin vars                                                    |
 
 ### FirebaseModule
 
-Global NestJS module. Initializes `firebase-admin` once using a service account loaded from environment variables:
+Global NestJS module. Initializes `firebase-admin` once at startup using a service account loaded from environment variables.
 
 ```
 FIREBASE_PROJECT_ID
 FIREBASE_CLIENT_EMAIL
-FIREBASE_PRIVATE_KEY   (newline-encoded: "-----BEGIN PRIVATE KEY-----\n...")
+FIREBASE_PRIVATE_KEY   (PEM key with literal "\n" sequences in the env var)
 ```
 
-`FirebaseService.verifyIdToken(token: string)` → returns `admin.auth.DecodedIdToken` or throws `UnauthorizedException`.
+**Important:** The private key stored in `.env` uses `\n` as literal characters. The module must parse it:
+
+```typescript
+privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+```
+
+`FirebaseService.verifyIdToken(token: string)` returns `admin.auth.DecodedIdToken` or throws `UnauthorizedException`.
 
 ### FirebaseAuthGuard
 
@@ -155,9 +178,20 @@ async findOrCreateFromFirebase(decoded: DecodedIdToken): Promise<User> {
 
 Parameter decorator that returns `request.user` (the internal `User` from Postgres). Usage: `@CurrentUser() user: User`.
 
-### Environment variables (new)
+### Environment variables
 
-```env
+Remove from `.env.example`:
+
+```
+JWT_SECRET
+JWT_EXPIRY
+JWT_REFRESH_SECRET
+JWT_REFRESH_EXPIRY
+```
+
+Add to `.env.example`:
+
+```
 FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
@@ -172,83 +206,207 @@ FIREBASE_PRIVATE_KEY=
 ```yaml
 firebase_core: ^3.x
 firebase_auth: ^5.x
-google_sign_in: ^6.x
+google_sign_in: ^6.1.0 # minimum 6.1.0 for firebase_auth ^5.x compatibility
 ```
 
-`flutter_secure_storage` is **not** added — Firebase SDK handles session persistence natively.
+`flutter_secure_storage` is **not** added — Firebase SDK handles session persistence natively via platform-native secure storage.
 
 ### New files
 
 ```
 lib/
-  firebase_options.dart                                    ← template; user fills values
+  firebase_options.dart                                    ← generated by flutterfire configure
   features/auth/
     domain/repositories/auth_repository.dart              ← abstract contract
     data/repositories/firebase_auth_repository.dart       ← Firebase implementation
 ```
 
+**`firebase_options.dart`:** Generated by running `flutterfire configure` with the Firebase project. This file contains platform API keys and must **always** be added to `.gitignore` regardless of repo visibility. Commit a `firebase_options.dart.example` template with placeholder values instead.
+
+### New dependency
+
+```bash
+cd apps/mobile && flutter pub add firebase_core firebase_auth google_sign_in
+```
+
 ### Modified files
 
-| File                                                      | Change                                                                              |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `bootstrap.dart`                                          | Add `await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)` |
-| `features/auth/application/providers/auth_provider.dart`  | Replace stub with authStateChanges() stream; add signInWithGoogle(); add register() |
-| `features/auth/presentation/screens/login_screen.dart`    | Wire to AuthNotifier; add Google Sign-In button                                     |
-| `features/auth/presentation/screens/register_screen.dart` | Wire to AuthNotifier                                                                |
-| `app/router/app_router.dart`                              | Add redirect guard                                                                  |
-| `core/network/interceptors/auth_interceptor.dart`         | Get fresh ID token from FirebaseAuth                                                |
+| File                                                      | Change                                                                                                |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `bootstrap.dart`                                          | Add `await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)` before `runApp()` |
+| `features/auth/domain/entities/user_entity.dart`          | Make `email` optional: `final String? email`                                                          |
+| `features/auth/application/providers/auth_provider.dart`  | Full rewrite — see AuthNotifier section below                                                         |
+| `features/auth/presentation/screens/login_screen.dart`    | Wire to AuthNotifier; add Google Sign-In button                                                       |
+| `features/auth/presentation/screens/register_screen.dart` | Wire to AuthNotifier                                                                                  |
+| `app/router/app_router.dart`                              | Add redirect guard (see below)                                                                        |
+| `core/network/interceptors/auth_interceptor.dart`         | Remove StorageService; inject Dio; get token from FirebaseAuth (see below)                            |
+| `core/network/api_client.dart`                            | Pass `dio` instance to `AuthInterceptor(dio)` constructor                                             |
+| `.gitignore` (mobile)                                     | Add `apps/mobile/lib/firebase_options.dart`                                                           |
 
-### AuthNotifier (new implementation)
+### AuthState (updated)
 
-**Source of truth:** `FirebaseAuth.instance.authStateChanges()` stream — no manual token storage.
-
-```
-build() → listen to authStateChanges()
-  null  → AuthState(status: unauthenticated)
-  User  → AuthState(status: authenticated, userId: user.uid, user: UserEntity(...))
-
-signIn(email, password) → FirebaseAuth.signIn() → stream updates state
-signInWithGoogle() → GoogleSignIn.signIn() → GoogleAuthProvider → FirebaseAuth.signIn()
-register(email, password) → FirebaseAuth.createUser()
-signOut() → FirebaseAuth.signOut() (+ GoogleSignIn.signOut() if Google session)
-```
-
-`AuthState` is updated reactively via stream — callers do not need to update state manually after sign-in.
-
-### AuthInterceptor (updated)
-
-On every outgoing request:
+Remove `accessToken` field — tokens are always fetched on demand from `FirebaseAuth.instance.currentUser?.getIdToken()`. Do not cache them in state.
 
 ```dart
-final token = await FirebaseAuth.instance.currentUser?.getIdToken();
-if (token != null) {
-  options.headers['Authorization'] = 'Bearer $token';
+class AuthState {
+  const AuthState({
+    this.status = AuthStatus.unknown,
+    this.userId,
+    this.user,       // UserEntity — populated when authenticated
+    this.error,
+  });
+
+  final AuthStatus status;
+  final String? userId;
+  final UserEntity? user;
+  final String? error;
 }
 ```
 
-Firebase SDK handles token refresh automatically (tokens expire every 1h; `getIdToken()` returns a fresh one transparently).
+### AuthNotifier — Riverpod pattern
+
+Use `StreamNotifier<AuthState>` (available since Riverpod 2.1). `build()` returns a `Stream<AuthState>` derived from `FirebaseAuth.instance.authStateChanges()`. This is the correct pattern for maintaining a live subscription — `AsyncNotifier` with a `Future<AuthState> build()` cannot maintain a live stream.
+
+```dart
+class AuthNotifier extends StreamNotifier<AuthState> {
+  @override
+  Stream<AuthState> build() {
+    return FirebaseAuth.instance.authStateChanges().map((firebaseUser) {
+      if (firebaseUser == null) {
+        return const AuthState(status: AuthStatus.unauthenticated);
+      }
+      return AuthState(
+        status: AuthStatus.authenticated,
+        userId: firebaseUser.uid,
+        user: UserEntity(
+          id: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          avatarUrl: firebaseUser.photoURL,
+        ),
+      );
+    });
+  }
+
+  Future<void> signIn({required String email, required String password}) async {
+    await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: email, password: password,
+    );
+    // authStateChanges() stream updates state automatically — no manual setState
+  }
+
+  Future<void> register({required String email, required String password}) async {
+    await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      email: email, password: password,
+    );
+    // stream updates state automatically
+  }
+
+  Future<void> signInWithGoogle() async {
+    final googleUser = await GoogleSignIn(scopes: ['email']).signIn();
+    if (googleUser == null) return; // user cancelled
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+    await FirebaseAuth.instance.signInWithCredential(credential);
+    // stream updates state automatically
+  }
+
+  Future<void> signOut() async {
+    await GoogleSignIn().signOut(); // no-op if not signed in via Google
+    await FirebaseAuth.instance.signOut();
+    // stream emits null → unauthenticated
+  }
+}
+
+final authProvider = StreamNotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
+```
+
+### AuthInterceptor (updated)
+
+Remove `StorageService` dependency entirely. On each request, get a fresh token from the Firebase SDK (which handles caching and proactive refresh automatically — tokens are refreshed when within 5 minutes of their 60-minute expiry).
+
+On 401, force-refresh the token and retry the request once. This handles edge cases like clock skew or server-side token revocation. If the retry also returns 401, propagate the error — `authStateChanges()` will handle the session if Firebase itself revokes the session.
+
+```dart
+class AuthInterceptor extends Interceptor {
+  // Requires the app's configured Dio instance for retry (not a bare Dio())
+  // so all interceptors, base URL, and timeouts are preserved on the retry request.
+  AuthInterceptor(this._dio);
+  final Dio _dio;
+
+  @override
+  Future<void> onRequest(
+    RequestOptions options,
+    RequestInterceptorHandler handler,
+  ) async {
+    final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+    if (token != null) {
+      options.headers['Authorization'] = 'Bearer $token';
+    }
+    handler.next(options);
+  }
+
+  @override
+  Future<void> onError(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
+    if (err.response?.statusCode == 401) {
+      // Force-refresh token and retry once via the configured Dio instance.
+      // This handles edge cases like clock skew or server-side token revocation.
+      final token = await FirebaseAuth.instance.currentUser?.getIdToken(true);
+      if (token != null) {
+        final retryOptions = err.requestOptions
+          ..headers['Authorization'] = 'Bearer $token';
+        try {
+          final response = await _dio.fetch(retryOptions);
+          return handler.resolve(response);
+        } catch (_) {
+          // fall through to propagate original error
+        }
+      }
+    }
+    handler.next(err);
+  }
+}
+```
 
 ### Router redirect guard
 
 ```dart
 redirect: (context, state) {
+  // ref.read is correct here — redirect is re-evaluated every time the Provider
+  // rebuilds, which is triggered by the ref.watch(authProvider) in routerProvider
+  // below. Do NOT add ref.watch here; that would cause an infinite rebuild loop.
   final authStatus = ref.read(authProvider).valueOrNull?.status;
-  final isPublic = ['/login', '/register', '/onboarding', '/'].contains(state.matchedLocation);
+  final isPublic = {
+    RouteNames.splash,
+    RouteNames.login,
+    RouteNames.register,
+    RouteNames.onboarding,
+  }.contains(state.matchedLocation);
 
-  if (authStatus == AuthStatus.unknown) return null; // wait for splash
-  if (authStatus == AuthStatus.unauthenticated && !isPublic) return '/login';
-  if (authStatus == AuthStatus.authenticated && isPublic) return '/home';
+  if (authStatus == null || authStatus == AuthStatus.unknown) return null; // wait
+  if (authStatus == AuthStatus.unauthenticated && !isPublic) return RouteNames.login;
+  if (authStatus == AuthStatus.authenticated && isPublic) return RouteNames.home;
   return null;
-}
+},
 ```
 
-### firebase_options.dart
+The `routerProvider` must `ref.watch(authProvider)` so it rebuilds (and re-evaluates the redirect) whenever auth state changes. The `redirect` callback above uses `ref.read` — this is intentional and correct:
 
-Delivered as a **template with placeholder values**. The user must:
-
-1. Create a Firebase project
-2. Register the iOS and Android apps
-3. Run `flutterfire configure` or manually fill in the values
+```dart
+final routerProvider = Provider<GoRouter>((ref) {
+  ref.watch(authProvider); // causes routerProvider to rebuild on auth state change
+  return GoRouter(
+    redirect: (context, state) { /* ... uses ref.read, see above */ },
+    routes: [...],
+  );
+});
+```
 
 ---
 
@@ -257,15 +415,15 @@ Delivered as a **template with placeholder values**. The user must:
 ```
 1. User signs in via Firebase SDK (email/password or Google)
 2. Firebase SDK stores session locally (platform-native secure storage)
-3. authStateChanges() emits FirebaseUser → AuthNotifier updates state
-4. App navigates to /home
-5. API call triggered → AuthInterceptor calls getIdToken()
-   - if token < 5min old: returns cached token
-   - if token expired: Firebase SDK silently refreshes using refresh token
+3. authStateChanges() emits FirebaseUser → AuthNotifier (StreamNotifier) updates state
+4. Router redirect fires → navigates to /home
+5. API call triggered → AuthInterceptor.onRequest() calls getIdToken()
+   - Firebase SDK returns cached token if it will not expire within 5 minutes
+   - Firebase SDK silently refreshes using platform refresh token if near expiry
 6. NestJS receives Bearer token → FirebaseAuthGuard verifies → upserts User
 7. Endpoint executes with @CurrentUser()
 8. On sign-out: FirebaseAuth.signOut() clears SDK session → authStateChanges() emits null
-   → AuthNotifier → unauthenticated → router redirects to /login
+   → StreamNotifier maps to unauthenticated → router redirects to /login
 ```
 
 ---
@@ -278,10 +436,10 @@ Firebase requires native platform configuration that cannot be automated:
 2. **Enable Auth providers:** Email/Password + Google
 3. **Register iOS app** → download `GoogleService-Info.plist` → place in `apps/mobile/ios/Runner/`
 4. **Register Android app** → download `google-services.json` → place in `apps/mobile/android/app/`
-5. **Generate service account key** (Project Settings → Service Accounts) → extract values into `.env`
-6. **Run `flutterfire configure`** or manually populate `firebase_options.dart`
+5. **Run `flutterfire configure`** in `apps/mobile/` → generates `lib/firebase_options.dart`
+6. **Generate service account key** (Project Settings → Service Accounts) → extract values into `.env`
 
-These steps are documented in `docs/firebase-setup.md` (to be created).
+These steps are documented in `docs/firebase-setup.md` (to be created during implementation).
 
 ---
 
