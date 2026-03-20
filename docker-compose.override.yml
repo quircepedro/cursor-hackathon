@@ -1,0 +1,14 @@
+version: '3.9'
+
+services:
+  postgres:
+    ports:
+      - '5432:5432'
+
+  redis:
+    ports:
+      - '6379:6379'
+
+# Local development overrides can be added here
+# These settings override docker-compose.yml during local development
+# Example: binding additional ports, mounting source volumes for hot reload, etc.
