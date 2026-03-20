@@ -29,20 +29,20 @@ enum SubscriptionTier {
 
 // Models
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  displayName String
+  id             String   @id @default(cuid())
+  providerUid    String   @unique
+  authProvider   String   @default("firebase")
+  email          String?
+  emailVerified  Boolean  @default(false)
+  displayName    String?
   profilePicture String?
-  bio       String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  bio            String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   recordings    Recording[]
   notifications Notification[]
-  refreshTokens RefreshToken[]
 
-  @@index([email])
   @@index([createdAt])
 }
 
@@ -118,20 +118,6 @@ model Clip {
   updatedAt DateTime @updatedAt
 
   @@index([recordingId])
-}
-
-model RefreshToken {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  token     String @unique
-  expiresAt DateTime
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([expiresAt])
 }
 
 model Notification {
