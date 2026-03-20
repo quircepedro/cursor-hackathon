@@ -1,0 +1,73 @@
+name: votio_mobile
+description: Voice journaling with AI analysis and visual clip generation
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
+
+  # State management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # Navigation
+  go_router: ^13.2.0
+
+  # Network
+  dio: ^5.4.3
+  retrofit: ^4.1.0
+
+  # Local storage
+  hive_flutter: ^1.1.0
+  shared_preferences: ^2.2.3
+
+  # Environment config
+  flutter_dotenv: ^5.1.0
+
+  # Utilities
+  freezed_annotation: ^2.4.1
+  json_annotation: ^4.8.1
+  equatable: ^2.0.5
+
+  # Logging
+  logger: ^2.3.0
+
+  # UI
+  cached_network_image: ^3.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+  # Code generation
+  build_runner: ^2.4.9
+  riverpod_generator: ^2.4.0
+  freezed: ^2.4.7
+  json_serializable: ^6.8.0
+  retrofit_generator: ^8.1.0
+
+  # Testing
+  mocktail: ^1.0.3
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/fonts/
+    - .env.development
+    - .env.staging
+    - .env.production
+
+  generate: true

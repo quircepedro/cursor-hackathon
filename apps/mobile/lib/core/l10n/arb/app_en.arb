@@ -1,0 +1,21 @@
+{
+  "@@locale": "en",
+  "appTitle": "Votio",
+  "@appTitle": { "description": "Application name" },
+  "continueButton": "Continue",
+  "@continueButton": {},
+  "saveButton": "Save",
+  "@saveButton": {},
+  "cancelButton": "Cancel",
+  "@cancelButton": {},
+  "retryButton": "Try again",
+  "@retryButton": {},
+  "errorGeneric": "Something went wrong",
+  "@errorGeneric": {},
+  "errorNoInternet": "No internet connection",
+  "@errorNoInternet": {},
+  "loadingDefault": "Loading...",
+  "@loadingDefault": {},
+  "emptyStateDefault": "Nothing here yet",
+  "@emptyStateDefault": {}
+}
