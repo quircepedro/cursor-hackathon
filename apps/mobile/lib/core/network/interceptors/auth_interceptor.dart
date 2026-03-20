@@ -1,16 +1,21 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../services/storage_service.dart';
-
-/// Attaches the Bearer token to outbound requests.
-/// On 401, clears the token and lets the caller handle re-authentication.
+/// Attaches a fresh Firebase ID token to each outbound request.
+/// On 401, force-refreshes the token and retries once using the same
+/// configured Dio instance (so all interceptors and base options are preserved).
 class AuthInterceptor extends Interceptor {
+  // The app's configured Dio instance is injected to avoid creating a bare
+  // Dio() for retries, which would bypass all other interceptors.
+  AuthInterceptor(this._dio);
+  final Dio _dio;
+
   @override
   Future<void> onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    final token = await StorageService.instance.getAccessToken();
+    final token = await FirebaseAuth.instance.currentUser?.getIdToken();
     if (token != null) {
       options.headers['Authorization'] = 'Bearer $token';
     }
@@ -18,10 +23,23 @@ class AuthInterceptor extends Interceptor {
   }
 
   @override
-  void onError(DioException err, ErrorInterceptorHandler handler) {
+  Future<void> onError(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
     if (err.response?.statusCode == 401) {
-      // Token expired — clear it, downstream error handling will redirect to login
-      StorageService.instance.clearTokens();
+      final token =
+          await FirebaseAuth.instance.currentUser?.getIdToken(true);
+      if (token != null) {
+        final retryOptions = err.requestOptions
+          ..headers['Authorization'] = 'Bearer $token';
+        try {
+          final response = await _dio.fetch<dynamic>(retryOptions);
+          return handler.resolve(response);
+        } catch (_) {
+          // fall through — propagate original error
+        }
+      }
     }
     handler.next(err);
   }

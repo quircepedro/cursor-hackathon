@@ -25,7 +25,7 @@ Dio buildDio(AppConfig config) {
   if (config.isDevelopment) {
     dio.interceptors.add(LoggingInterceptor(LoggerService.instance));
   }
-  dio.interceptors.add(AuthInterceptor());
+  dio.interceptors.add(AuthInterceptor(dio));
   dio.interceptors.add(ErrorInterceptor());
 
   return dio;
