@@ -1,6 +1,4 @@
-import 'core/config/app_config.dart';
 import 'bootstrap.dart';
+import 'core/config/app_config.dart';
 
-void main() => bootstrap(
-      config: AppConfig.production(),
-    );
+void main() => bootstrap(environment: AppEnvironment.production);
