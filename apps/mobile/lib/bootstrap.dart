@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import 'app/app.dart';
 import 'core/config/app_config.dart';
@@ -22,6 +23,9 @@ Future<void> bootstrap({required AppConfig config}) async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize Google Sign In (v7 requires explicit initialization)
+  await GoogleSignIn.instance.initialize();
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
