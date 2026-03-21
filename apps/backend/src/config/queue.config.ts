@@ -10,7 +10,7 @@ export default registerAs('queue', () => {
     REDIS_URL: Joi.string().required().uri(),
   });
 
-  const { error, value } = schema.validate(process.env) as unknown as {
+  const { error, value } = schema.validate(process.env, { allowUnknown: true }) as unknown as {
     error?: Error;
     value: Record<string, unknown>;
   };

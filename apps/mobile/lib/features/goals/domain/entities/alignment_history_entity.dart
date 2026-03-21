@@ -11,11 +11,17 @@ class GoalScoreEntry {
 
   factory GoalScoreEntry.fromJson(Map<String, dynamic> json) {
     return GoalScoreEntry(
-      goalId: json['goalId'] as String,
-      title: json['title'] as String,
-      score: (json['score'] as num).toDouble(),
+      goalId: json['goalId']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      score: (json['score'] as num?)?.toDouble().clamp(0.0, 1.0) ?? 0.0,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'goalId': goalId,
+        'title': title,
+        'score': score,
+      };
 }
 
 class AlignmentHistoryEntry {
@@ -31,12 +37,23 @@ class AlignmentHistoryEntry {
 
   factory AlignmentHistoryEntry.fromJson(Map<String, dynamic> json) {
     final rawGoals = json['goals'] as List<dynamic>? ?? [];
+    final dateStr = json['date']?.toString();
+    final parsed = dateStr != null ? DateTime.tryParse(dateStr) : null;
     return AlignmentHistoryEntry(
-      date: DateTime.parse(json['date'] as String),
-      overallScore: (json['overallScore'] as num).toDouble(),
-      goals: rawGoals
-          .map((g) => GoalScoreEntry.fromJson(g as Map<String, dynamic>))
-          .toList(),
+      date: parsed ?? DateTime.now(),
+      overallScore:
+          (json['overallScore'] as num?)?.toDouble().clamp(0.0, 1.0) ?? 0.0,
+      goals: [
+        for (final g in rawGoals)
+          if (g is Map)
+            GoalScoreEntry.fromJson(Map<String, dynamic>.from(g)),
+      ],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'date': date.toUtc().toIso8601String(),
+        'overallScore': overallScore,
+        'goals': goals.map((g) => g.toJson()).toList(),
+      };
 }

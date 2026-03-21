@@ -11,37 +11,61 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      backgroundColor: const Color(0xFF050505),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'Settings',
+          style: TextStyle(color: Colors.white),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
       body: ListView(
         children: [
           ListTile(
-            leading: const Icon(Icons.star_outline),
-            title: const Text('Upgrade to Pro'),
-            trailing: const Icon(Icons.chevron_right),
+            leading: const Icon(Icons.star_outline, color: Color(0xFF6366F1)),
+            title: const Text(
+              'Upgrade to Pro',
+              style: TextStyle(color: Colors.white),
+            ),
+            trailing: Icon(Icons.chevron_right, color: Colors.grey[600]),
             onTap: () => context.push(RouteNames.paywall),
           ),
           ListTile(
-            leading: const Icon(Icons.person_outline),
-            title: const Text('Account'),
-            trailing: const Icon(Icons.chevron_right),
+            leading: Icon(Icons.person_outline, color: Colors.grey[400]),
+            title: const Text(
+              'Account',
+              style: TextStyle(color: Colors.white),
+            ),
+            trailing: Icon(Icons.chevron_right, color: Colors.grey[600]),
             onTap: () {},
           ),
           ListTile(
-            leading: const Icon(Icons.notifications_outlined),
-            title: const Text('Notifications'),
-            trailing: const Icon(Icons.chevron_right),
+            leading: Icon(Icons.notifications_outlined, color: Colors.grey[400]),
+            title: const Text(
+              'Notifications',
+              style: TextStyle(color: Colors.white),
+            ),
+            trailing: Icon(Icons.chevron_right, color: Colors.grey[600]),
             onTap: () {},
           ),
           ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('Privacy'),
-            trailing: const Icon(Icons.chevron_right),
+            leading: Icon(Icons.privacy_tip_outlined, color: Colors.grey[400]),
+            title: const Text(
+              'Privacy',
+              style: TextStyle(color: Colors.white),
+            ),
+            trailing: Icon(Icons.chevron_right, color: Colors.grey[600]),
             onTap: () {},
           ),
-          const Divider(),
+          Divider(color: Colors.white.withOpacity(0.1)),
           ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Sign out', style: TextStyle(color: Colors.red)),
+            leading: const Icon(Icons.logout, color: Color(0xFFEF4444)),
+            title: const Text(
+              'Sign out',
+              style: TextStyle(color: Color(0xFFEF4444)),
+            ),
             onTap: () => ref.read(authProvider.notifier).signOut(),
           ),
         ],

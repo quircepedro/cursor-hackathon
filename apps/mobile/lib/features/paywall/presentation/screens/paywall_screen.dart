@@ -7,9 +7,12 @@ class PaywallScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF050505),
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => context.pop(),
         ),
       ),
@@ -19,22 +22,46 @@ class PaywallScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Unlock Votio Pro', style: Theme.of(context).textTheme.headlineLarge),
+              const Text(
+                'Unlock Votio Pro',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 12),
               Text(
                 'Unlimited recordings, advanced insights, and HD clips.',
-                style: Theme.of(context).textTheme.bodyLarge,
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 16,
+                  height: 1.5,
+                ),
               ),
               const Spacer(),
-              // TODO: wire to SubscriptionsModule
               ElevatedButton(
                 onPressed: () {},
-                child: const Text('Start free trial'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: const Text(
+                  'Start free trial',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
               const SizedBox(height: 12),
               TextButton(
                 onPressed: () => context.pop(),
-                child: const Text('Maybe later'),
+                child: Text(
+                  'Maybe later',
+                  style: TextStyle(color: Colors.grey[400]),
+                ),
               ),
             ],
           ),

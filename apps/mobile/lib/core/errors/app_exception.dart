@@ -24,7 +24,7 @@ class ServerException extends AppException {
 }
 
 class NotFoundException extends AppException {
-  const NotFoundException([super.message = 'Not found']) : super(code: 'NOT_FOUND');
+  const NotFoundException([super.message = 'No encontrado']) : super(code: 'NOT_FOUND');
 }
 
 class CacheException extends AppException {

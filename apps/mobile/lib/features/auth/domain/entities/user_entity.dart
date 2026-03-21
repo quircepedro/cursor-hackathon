@@ -6,13 +6,15 @@ class UserEntity extends Equatable {
     this.email,
     this.displayName,
     this.avatarUrl,
+    this.emailVerified = false,
   });
 
   final String id;
   final String? email;
   final String? displayName;
   final String? avatarUrl;
+  final bool emailVerified;
 
   @override
-  List<Object?> get props => [id, email, displayName, avatarUrl];
+  List<Object?> get props => [id, email, displayName, avatarUrl, emailVerified];
 }

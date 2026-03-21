@@ -18,29 +18,39 @@ class AppConfig {
     required this.crashReportingEnabled,
   });
 
-  factory AppConfig.development() => AppConfig(
+  factory AppConfig.development({required String apiBaseUrl}) => AppConfig(
         environment: AppEnvironment.development,
-        apiBaseUrl: dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000/api/v1',
+        apiBaseUrl: apiBaseUrl,
         apiTimeoutMs: int.tryParse(dotenv.env['API_TIMEOUT_MS'] ?? '') ?? 30000,
         analyticsEnabled: false,
         crashReportingEnabled: false,
       );
 
-  factory AppConfig.staging() => AppConfig(
+  factory AppConfig.staging() {
+    const fromDefine = String.fromEnvironment('API_BASE_URL', defaultValue: '');
+    return AppConfig(
         environment: AppEnvironment.staging,
-        apiBaseUrl: dotenv.env['API_BASE_URL'] ?? 'https://api-staging.votio.app/api/v1',
+        apiBaseUrl: fromDefine.isNotEmpty
+            ? fromDefine
+            : (dotenv.env['API_BASE_URL'] ?? 'https://api-staging.votio.app/api/v1'),
         apiTimeoutMs: int.tryParse(dotenv.env['API_TIMEOUT_MS'] ?? '') ?? 30000,
         analyticsEnabled: true,
         crashReportingEnabled: true,
       );
+  }
 
-  factory AppConfig.production() => AppConfig(
+  factory AppConfig.production() {
+    const fromDefine = String.fromEnvironment('API_BASE_URL', defaultValue: '');
+    return AppConfig(
         environment: AppEnvironment.production,
-        apiBaseUrl: dotenv.env['API_BASE_URL'] ?? 'https://api.votio.app/api/v1',
+        apiBaseUrl: fromDefine.isNotEmpty
+            ? fromDefine
+            : (dotenv.env['API_BASE_URL'] ?? 'https://api.votio.app/api/v1'),
         apiTimeoutMs: int.tryParse(dotenv.env['API_TIMEOUT_MS'] ?? '') ?? 30000,
         analyticsEnabled: true,
         crashReportingEnabled: true,
       );
+  }
 
   String get envFileName => switch (environment) {
         AppEnvironment.development => '.env.development',

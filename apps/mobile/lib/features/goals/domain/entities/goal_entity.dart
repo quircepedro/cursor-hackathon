@@ -16,4 +16,10 @@ class GoalEntity {
       active: json['active'] as bool? ?? true,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'active': active,
+      };
 }

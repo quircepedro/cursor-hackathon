@@ -5,6 +5,9 @@ yarn-debug.log*
 yarn-error.log*
 .npm
 
+# TypeScript incremental
+*.tsbuildinfo
+
 # Build artifacts
 dist/
 build/

@@ -69,6 +69,7 @@ void main() {
         email: 'a@b.com',
         displayName: 'Alice',
         avatarUrl: null,
+        emailVerified: true,
       );
       when(() => repo.authStateChanges()).thenAnswer((_) => Stream.value(fakeUser));
 
@@ -80,6 +81,26 @@ void main() {
       expect(state.status, AuthStatus.authenticated);
       expect(state.userId, 'uid-abc');
       expect(state.user?.email, 'a@b.com');
+    });
+  });
+
+  group('AuthNotifier sendPasswordResetEmail', () {
+    test('delegates to repository', () async {
+      final repo = MockAuthRepository();
+      when(() => repo.authStateChanges()).thenAnswer((_) => Stream.value(null));
+      when(() => repo.sendPasswordResetEmail(email: any(named: 'email')))
+          .thenAnswer((_) async {});
+
+      final container = makeContainer(repo);
+      addTearDown(container.dispose);
+      await container.read(authProvider.future);
+
+      await container
+          .read(authProvider.notifier)
+          .sendPasswordResetEmail(email: 'test@example.com');
+
+      verify(() => repo.sendPasswordResetEmail(email: 'test@example.com'))
+          .called(1);
     });
   });
 

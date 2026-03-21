@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Goal } from '@prisma/client';
+
+/** Títulos de objetivos para el prompt (BD o cliente). */
+export type GoalPromptInput = { title: string };
 
 export interface GoalAlignmentResult {
   goalIndex: number;
@@ -22,10 +24,17 @@ export interface AnalysisResult {
   };
 }
 
-function buildSystemPrompt(goals: Goal[]): string {
-  const goalsSection = goals
-    .map((g, i) => `  goal_${i}: "${g.title}"`)
-    .join('\n');
+function escapeForPrompt(title: string): string {
+  return title.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function buildSystemPrompt(goals: GoalPromptInput[]): string {
+  const goalsSection =
+    goals.length === 0
+      ? '  (sin objetivos — devuelve goalAlignment.goals como [] y overallScore 0.)'
+      : goals
+          .map((g, i) => `  goal_${i}: "${escapeForPrompt(g.title)}"`)
+          .join('\n');
 
   return `Eres un analista experto integrado en una app de journaling diario por voz. Tu trabajo es analizar el transcript del usuario y devolver un JSON válido con dos secciones: análisis emocional y alineación con objetivos.
 
@@ -86,7 +95,10 @@ export class AnalysisService {
     this.geminiApiKey = this.config.get<string>('GEMINI_API_KEY') ?? '';
   }
 
-  async analyseJournal(transcript: string, goals: Goal[]): Promise<AnalysisResult> {
+  async analyseJournal(
+    transcript: string,
+    goals: GoalPromptInput[],
+  ): Promise<AnalysisResult> {
     this.logger.log('Analysing journal transcript with Gemini (structured JSON)');
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.geminiModel}:generateContent?key=${this.geminiApiKey}`;
@@ -157,7 +169,7 @@ export class AnalysisService {
     }
   }
 
-  private fallbackResult(goals: Goal[]): AnalysisResult {
+  private fallbackResult(goals: GoalPromptInput[]): AnalysisResult {
     return {
       emotion: {
         summary: 'No se ha podido generar un análisis para esta entrada.',

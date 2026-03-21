@@ -65,7 +65,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sign in')),
+      backgroundColor: const Color(0xFF050505),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'Sign in',
+          style: TextStyle(color: Colors.white),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -75,9 +84,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 32),
               TextFormField(
                 controller: _emailController,
-                decoration: const InputDecoration(
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
                   labelText: 'Email',
-                  prefixIcon: Icon(Icons.email_outlined),
+                  labelStyle: TextStyle(color: Colors.grey[500]),
+                  prefixIcon: Icon(Icons.email_outlined, color: Colors.grey[500]),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.05),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: Color(0xFF6366F1), width: 2),
+                  ),
                 ),
                 keyboardType: TextInputType.emailAddress,
                 enabled: !_loading,
@@ -85,9 +110,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _passwordController,
-                decoration: const InputDecoration(
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
                   labelText: 'Password',
-                  prefixIcon: Icon(Icons.lock_outline),
+                  labelStyle: TextStyle(color: Colors.grey[500]),
+                  prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[500]),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.05),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: Color(0xFF6366F1), width: 2),
+                  ),
                 ),
                 obscureText: true,
                 enabled: !_loading,
@@ -96,7 +137,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 12),
                 Text(
                   _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  style: const TextStyle(color: Color(0xFFEF4444)),
                 ),
               ],
               const SizedBox(height: 32),
@@ -107,13 +148,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: _loading ? null : _signInWithGoogle,
-                icon: const Icon(Icons.login),
-                label: const Text('Continue with Google'),
+                icon: Icon(Icons.login, color: Colors.grey[300]),
+                label: Text(
+                  'Continue with Google',
+                  style: TextStyle(color: Colors.grey[300]),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () => context.push(RouteNames.register),
-                child: const Text("Don't have an account? Register"),
+                child: Text(
+                  "Don't have an account? Register",
+                  style: TextStyle(color: Colors.grey[400]),
+                ),
+              ),
+              TextButton(
+                onPressed: () => context.push(
+                  '${RouteNames.forgotPassword}?email=${Uri.encodeComponent(_emailController.text.trim())}',
+                ),
+                child: Text(
+                  'Forgot your password?',
+                  style: TextStyle(color: Colors.grey[400]),
+                ),
               ),
             ],
           ),

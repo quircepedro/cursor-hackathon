@@ -9,6 +9,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import 'app/app.dart';
 import 'core/config/app_config.dart';
+import 'core/config/development_api_base_url.dart';
 import 'core/services/logger_service.dart';
 import 'firebase_options.dart';
 
@@ -24,9 +25,10 @@ Future<void> bootstrap({required AppEnvironment environment}) async {
   };
   await dotenv.load(fileName: envFileName);
 
-  // Now it's safe to construct AppConfig (reads dotenv.env)
   final config = switch (environment) {
-    AppEnvironment.development => AppConfig.development(),
+    AppEnvironment.development => AppConfig.development(
+        apiBaseUrl: await resolveDevelopmentApiBaseUrlAsync(),
+      ),
     AppEnvironment.staging => AppConfig.staging(),
     AppEnvironment.production => AppConfig.production(),
   };
@@ -36,8 +38,13 @@ Future<void> bootstrap({required AppEnvironment environment}) async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Initialize Google Sign In (v7 requires explicit initialization)
-  await GoogleSignIn.instance.initialize();
+  // Initialize Google Sign In (v7 requires explicit initialization).
+  // serverClientId is the Web OAuth client ID — required so that
+  // authenticate() returns a non-null idToken for Firebase Auth.
+  await GoogleSignIn.instance.initialize(
+    serverClientId:
+        '1067712342300-ded0vjfiublg9h7c9gkhr645sfutgsuc.apps.googleusercontent.com',
+  );
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
@@ -47,6 +54,9 @@ Future<void> bootstrap({required AppEnvironment environment}) async {
 
   // Initialize logger
   LoggerService.init(config: config);
+  if (config.isDevelopment) {
+    LoggerService.instance.d('Votio dev API base: ${config.apiBaseUrl}');
+  }
 
   // Run the app
   runApp(

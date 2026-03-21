@@ -16,7 +16,7 @@ export default registerAs('storage', () => {
   });
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const { error, value } = schema.validate(process.env);
+  const { error, value } = schema.validate(process.env, { allowUnknown: true });
 
   if (error) {
     throw new Error(`Storage config validation error: ${error.message}`);

@@ -17,6 +17,10 @@ class AlignmentTrendChart extends StatelessWidget {
   Widget build(BuildContext context) {
     if (history.isEmpty) return const SizedBox.shrink();
 
+    final maxX = history.length <= 1
+        ? 1.0
+        : (history.length - 1).toDouble();
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -41,6 +45,8 @@ class AlignmentTrendChart extends StatelessWidget {
             height: 180,
             child: LineChart(
               LineChartData(
+                minX: 0,
+                maxX: maxX,
                 minY: 0,
                 maxY: 1,
                 clipData: const FlClipData.all(),
@@ -74,12 +80,10 @@ class AlignmentTrendChart extends StatelessWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 28,
-                      interval: 1,
+                      interval: maxX > 0 ? maxX / 4 : 1,
                       getTitlesWidget: (value, meta) {
-                        final idx = value.toInt();
-                        if (idx < 0 || idx >= history.length) {
-                          return const SizedBox.shrink();
-                        }
+                        final idx = value.round().clamp(0, history.length - 1);
+                        if (history.isEmpty) return const SizedBox.shrink();
                         // Show label for first, last, and middle
                         if (idx != 0 &&
                             idx != history.length - 1 &&
@@ -125,16 +129,43 @@ class AlignmentTrendChart extends StatelessWidget {
     );
   }
 
+  double _clampScore(double v) => v.clamp(0.0, 1.0);
+
+  List<FlSpot> _overallSpots() {
+    if (history.isEmpty) return [];
+    if (history.length == 1) {
+      final y = _clampScore(history[0].overallScore);
+      return [FlSpot(0, y), FlSpot(1, y)];
+    }
+    return List.generate(
+      history.length,
+      (i) => FlSpot(i.toDouble(), _clampScore(history[i].overallScore)),
+    );
+  }
+
+  List<FlSpot> _goalSpots(int g) {
+    if (history.isEmpty) return [];
+    if (history.length == 1) {
+      final score = g < history[0].goals.length
+          ? _clampScore(history[0].goals[g].score)
+          : 0.0;
+      return [FlSpot(0, score), FlSpot(1, score)];
+    }
+    return List.generate(history.length, (i) {
+      if (g < history[i].goals.length) {
+        return FlSpot(i.toDouble(), _clampScore(history[i].goals[g].score));
+      }
+      return FlSpot(i.toDouble(), 0);
+    });
+  }
+
   List<LineChartBarData> _buildLines() {
     final lines = <LineChartBarData>[];
+    final canCurve = history.length >= 2;
 
-    // Overall line
     lines.add(LineChartBarData(
-      spots: List.generate(
-        history.length,
-        (i) => FlSpot(i.toDouble(), history[i].overallScore),
-      ),
-      isCurved: true,
+      spots: _overallSpots(),
+      isCurved: canCurve,
       color: _lineColors[0],
       barWidth: 2.5,
       dotData: const FlDotData(show: false),
@@ -144,18 +175,12 @@ class AlignmentTrendChart extends StatelessWidget {
       ),
     ));
 
-    // Per-goal lines
     if (history.isNotEmpty) {
       final goalCount = history.first.goals.length;
       for (var g = 0; g < goalCount && g < 4; g++) {
         lines.add(LineChartBarData(
-          spots: List.generate(history.length, (i) {
-            if (g < history[i].goals.length) {
-              return FlSpot(i.toDouble(), history[i].goals[g].score);
-            }
-            return FlSpot(i.toDouble(), 0);
-          }),
-          isCurved: true,
+          spots: _goalSpots(g),
+          isCurved: canCurve,
           color: _lineColors[(g + 1) % _lineColors.length].withValues(alpha: 0.6),
           barWidth: 1.5,
           dotData: const FlDotData(show: false),

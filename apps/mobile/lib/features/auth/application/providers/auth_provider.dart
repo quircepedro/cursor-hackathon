@@ -12,7 +12,7 @@ final authRepositoryProvider = Provider<AuthRepository>(
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-enum AuthStatus { unknown, authenticated, unauthenticated }
+enum AuthStatus { unknown, authenticated, pendingVerification, unauthenticated }
 
 class AuthState {
   const AuthState({
@@ -28,6 +28,7 @@ class AuthState {
   final String? error;
 
   bool get isAuthenticated => status == AuthStatus.authenticated;
+  bool get isPendingVerification => status == AuthStatus.pendingVerification;
 
   AuthState copyWith({
     AuthStatus? status,
@@ -52,16 +53,17 @@ class AuthNotifier extends StreamNotifier<AuthState> {
       if (firebaseUser == null) {
         return const AuthState(status: AuthStatus.unauthenticated);
       }
-      return AuthState(
-        status: AuthStatus.authenticated,
-        userId: firebaseUser.uid,
-        user: UserEntity(
-          id: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          avatarUrl: firebaseUser.avatarUrl,
-        ),
+      final user = UserEntity(
+        id: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName,
+        avatarUrl: firebaseUser.avatarUrl,
+        emailVerified: firebaseUser.emailVerified,
       );
+      final status = firebaseUser.emailVerified
+          ? AuthStatus.authenticated
+          : AuthStatus.pendingVerification;
+      return AuthState(status: status, userId: firebaseUser.uid, user: user);
     });
   }
 
@@ -70,7 +72,6 @@ class AuthNotifier extends StreamNotifier<AuthState> {
           email: email,
           password: password,
         );
-    // authStateChanges() stream updates state automatically
   }
 
   Future<void> register({required String email, required String password}) async {
@@ -78,6 +79,8 @@ class AuthNotifier extends StreamNotifier<AuthState> {
           email: email,
           password: password,
         );
+    // Send verification email immediately after account creation
+    await ref.read(authRepositoryProvider).sendEmailVerification();
   }
 
   Future<void> signInWithGoogle() async {
@@ -86,6 +89,39 @@ class AuthNotifier extends StreamNotifier<AuthState> {
 
   Future<void> signOut() async {
     await ref.read(authRepositoryProvider).signOut();
+  }
+
+  Future<void> sendEmailVerification() async {
+    await ref.read(authRepositoryProvider).sendEmailVerification();
+  }
+
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    await ref.read(authRepositoryProvider).sendPasswordResetEmail(email: email);
+  }
+
+  /// Reloads the Firebase user and updates state if now verified.
+  /// Returns true if the user is now verified.
+  Future<bool> reloadAndCheckEmailVerified() async {
+    final verified = await ref.read(authRepositoryProvider).reloadAndCheckEmailVerified();
+    if (verified && state.value != null) {
+      state = AsyncValue.data(
+        state.value!.copyWith(
+          status: AuthStatus.authenticated,
+          user: state.value!.user?.emailVerified == false
+              ? UserEntity(
+                  id: state.value!.user!.id,
+                  email: state.value!.user!.email,
+                  displayName: state.value!.user!.displayName,
+                  avatarUrl: state.value!.user!.avatarUrl,
+                  emailVerified: true,
+                )
+              : state.value!.user,
+        ),
+      );
+      // Force the stream to re-emit the updated state
+      state = AsyncValue.data(state.value!);
+    }
+    return verified;
   }
 }
 

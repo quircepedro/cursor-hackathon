@@ -1,14 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/network/api_client.dart';
-import '../../data/repositories/api_goals_repository.dart';
+import '../../../auth/application/providers/auth_provider.dart';
+import '../../data/repositories/local_goals_repository.dart';
 import '../../domain/entities/goal_entity.dart';
 import '../../domain/repositories/goals_repository.dart';
 
 // Repository provider
 final goalsRepositoryProvider = Provider<GoalsRepository>((ref) {
-  final dio = ref.watch(dioProvider);
-  return ApiGoalsRepository(dio);
+  final uid = ref.watch(authProvider).valueOrNull?.userId;
+  final scope =
+      (uid != null && uid.isNotEmpty) ? uid : '_anon';
+  return LocalGoalsRepository(scope);
 });
 
 // Goals state
@@ -52,7 +54,7 @@ class GoalsNotifier extends Notifier<GoalsState> {
         goals: goals,
       );
     } catch (e) {
-      state = GoalsState(status: GoalsStatus.error, error: e.toString());
+      state = const GoalsState(status: GoalsStatus.noGoals, goals: []);
     }
   }
 

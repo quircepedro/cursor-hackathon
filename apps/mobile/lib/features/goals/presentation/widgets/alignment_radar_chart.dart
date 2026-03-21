@@ -8,7 +8,8 @@ class AlignmentRadarChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (alignments.length < 3) return const SizedBox.shrink();
+    // Radar útil desde 2 objetivos (antes requería 3 y muchos usuarios no veían el gráfico).
+    if (alignments.length < 2) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.all(20),

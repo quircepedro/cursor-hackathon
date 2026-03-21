@@ -9,7 +9,7 @@ async function bootstrap(): Promise<void> {
   const configService = app.get(ConfigService);
 
   // Setup middleware
-  app.use(CorrelationIdMiddleware);
+  app.use(new CorrelationIdMiddleware().use.bind(new CorrelationIdMiddleware()));
 
   // Setup CORS
   const corsOrigins = configService.get<string>('app.cors_origins', 'http://localhost:3000');
@@ -34,9 +34,9 @@ async function bootstrap(): Promise<void> {
   SwaggerModule.setup('api/docs', app, swaggerDocument);
 
   const port = configService.get<number>('app.port', 3000);
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
-  console.log(`✅ NestJS application is running on: http://localhost:${port}/${apiPrefix}`);
+  console.log(`✅ NestJS application is running on: http://0.0.0.0:${port}/${apiPrefix}`);
   console.log(`📚 Swagger docs at: http://localhost:${port}/api/docs`);
 }
 

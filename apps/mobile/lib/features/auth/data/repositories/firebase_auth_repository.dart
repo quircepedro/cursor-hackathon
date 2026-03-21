@@ -7,7 +7,13 @@ class FirebaseAuthRepository implements AuthRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
-  Stream<({String uid, String? email, String? displayName, String? avatarUrl})?>
+  Stream<({
+    String uid,
+    String? email,
+    String? displayName,
+    String? avatarUrl,
+    bool emailVerified,
+  })?>
       authStateChanges() {
     return _auth.authStateChanges().map((user) {
       if (user == null) return null;
@@ -16,6 +22,7 @@ class FirebaseAuthRepository implements AuthRepository {
         email: user.email,
         displayName: user.displayName,
         avatarUrl: user.photoURL,
+        emailVerified: user.emailVerified,
       );
     });
   }
@@ -38,7 +45,6 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Future<void> signInWithGoogle() async {
-    // google_sign_in v7: authenticate() throws GoogleSignInException on cancel
     final account = await GoogleSignIn.instance.authenticate();
     final credential = GoogleAuthProvider.credential(
       idToken: account.authentication.idToken,
@@ -50,5 +56,21 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<void> signOut() async {
     await GoogleSignIn.instance.signOut();
     await _auth.signOut();
+  }
+
+  @override
+  Future<void> sendEmailVerification() async {
+    await _auth.currentUser?.sendEmailVerification();
+  }
+
+  @override
+  Future<bool> reloadAndCheckEmailVerified() async {
+    await _auth.currentUser?.reload();
+    return _auth.currentUser?.emailVerified ?? false;
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    await _auth.sendPasswordResetEmail(email: email);
   }
 }

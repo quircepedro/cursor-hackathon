@@ -17,7 +17,7 @@ export default registerAs('app', () => {
     ),
   });
 
-  const { error, value } = schema.validate(process.env) as unknown as {
+  const { error, value } = schema.validate(process.env, { allowUnknown: true }) as unknown as {
     error?: Error;
     value: Record<string, unknown>;
   };

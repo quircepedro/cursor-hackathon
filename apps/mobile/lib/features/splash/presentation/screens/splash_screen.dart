@@ -29,12 +29,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      backgroundColor: AppColors.primary,
+      backgroundColor: Color(0xFF050505),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.mic_rounded, size: 72, color: Colors.white),
+            Icon(
+              Icons.mic_rounded,
+              size: 72,
+              color: Color(0xFF6366F1),
+            ),
             SizedBox(height: 16),
             Text(
               'Votio',

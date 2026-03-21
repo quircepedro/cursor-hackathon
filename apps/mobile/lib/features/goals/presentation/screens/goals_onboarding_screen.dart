@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
+import '../../../../core/errors/app_exception.dart';
 import '../../application/providers/goals_provider.dart';
 
 class GoalsOnboardingScreen extends ConsumerStatefulWidget {
@@ -49,8 +51,13 @@ class _GoalsOnboardingScreenState extends ConsumerState<GoalsOnboardingScreen> {
       if (mounted) context.go(RouteNames.home);
     } catch (e) {
       if (mounted) {
+        final message = switch (e) {
+          DioException(:final error) when error is AppException => error.message,
+          AppException(:final message) => message,
+          _ => e.toString(),
+        };
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(message)),
         );
         setState(() => _isSubmitting = false);
       }

@@ -1,4 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/network/api_client.dart';
+import '../../../goals/application/providers/goals_provider.dart';
+import '../../data/repositories/api_recording_repository.dart';
+import '../../domain/entities/insight_entity.dart';
+import '../../domain/repositories/recording_repository.dart';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -20,6 +28,8 @@ class RecordingState {
     this.durationSeconds = 0,
     this.audioFilePath,
     this.recordingId,
+    this.transcript,
+    this.insight,
     this.error,
   });
 
@@ -27,25 +37,19 @@ class RecordingState {
   final int durationSeconds;
   final String? audioFilePath;
   final String? recordingId;
+  final String? transcript;
+  final InsightEntity? insight;
   final String? error;
 
   bool get isRecording => status == RecordingStatus.recording;
-  bool get isProcessing => switch (status) {
-        RecordingStatus.uploading ||
-        RecordingStatus.transcribing ||
-        RecordingStatus.analysing ||
-        RecordingStatus.generatingClip =>
-          true,
-        _ => false,
-      };
 
   String get statusLabel => switch (status) {
         RecordingStatus.idle => 'Ready to record',
         RecordingStatus.recording => 'Recording...',
         RecordingStatus.stopped => 'Processing...',
         RecordingStatus.uploading => 'Uploading...',
-        RecordingStatus.transcribing => 'Transcribing...',
-        RecordingStatus.analysing => 'Analysing...',
+        RecordingStatus.transcribing => 'Transcribing your voice...',
+        RecordingStatus.analysing => 'Analysing your emotions...',
         RecordingStatus.generatingClip => 'Creating your clip...',
         RecordingStatus.complete => 'Done!',
         RecordingStatus.error => 'Something went wrong',
@@ -56,6 +60,8 @@ class RecordingState {
     int? durationSeconds,
     String? audioFilePath,
     String? recordingId,
+    String? transcript,
+    InsightEntity? insight,
     String? error,
   }) =>
       RecordingState(
@@ -63,6 +69,8 @@ class RecordingState {
         durationSeconds: durationSeconds ?? this.durationSeconds,
         audioFilePath: audioFilePath ?? this.audioFilePath,
         recordingId: recordingId ?? this.recordingId,
+        transcript: transcript ?? this.transcript,
+        insight: insight ?? this.insight,
         error: error,
       );
 }
@@ -73,29 +81,177 @@ class RecordingNotifier extends Notifier<RecordingState> {
   @override
   RecordingState build() => const RecordingState();
 
-  void startRecording() {
-    // TODO: call AudioService.startRecording()
-    state = state.copyWith(status: RecordingStatus.recording, durationSeconds: 0);
+  RecordingRepository get _repo => ref.read(recordingRepositoryProvider);
+
+  void _persistAlignmentSnapshot() {
+    final insight = state.insight;
+    if (insight == null) return;
+    final snapshot = insight.toAlignmentHistorySnapshot();
+    if (snapshot == null) return;
+    unawaited(
+      ref.read(goalsRepositoryProvider).appendAlignmentHistory(snapshot),
+    );
   }
 
-  void updateDuration(int seconds) {
-    state = state.copyWith(durationSeconds: seconds);
+  void updateDuration(int seconds) =>
+      state = state.copyWith(durationSeconds: seconds);
+
+  /// Step 1: upload audio + wait for transcription only.
+  /// Called from TranscriptionReviewScreen.
+  Future<void> uploadAndTranscribe(String audioPath) async {
+    state = state.copyWith(
+      status: RecordingStatus.uploading,
+      audioFilePath: audioPath,
+    );
+
+    try {
+      final recordingId = await _repo.uploadAudio(audioPath);
+      state = state.copyWith(
+        status: RecordingStatus.transcribing,
+        recordingId: recordingId,
+      );
+
+      // Poll until transcription is ready
+      while (true) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        final response = await _repo.getStatus(recordingId);
+
+        // Keep polling while still in early stages
+        if (response.status == 'PENDING' ||
+            response.status == 'UPLOADING' ||
+            response.status == 'TRANSCRIBING') {
+          continue;
+        }
+
+        // Pipeline failed before transcription finished
+        if (response.status == 'FAILED') {
+          state = state.copyWith(
+            status: RecordingStatus.error,
+            error: 'Transcription failed. Please check your API key.',
+          );
+          return;
+        }
+
+        // Transcription is done (ANALYZING or COMPLETE)
+        state = state.copyWith(
+          status: RecordingStatus.analysing,
+          transcript: response.transcript,
+          insight: response.insight,
+        );
+        break;
+      }
+    } catch (e) {
+      state = state.copyWith(
+        status: RecordingStatus.error,
+        error: e.toString(),
+      );
+    }
   }
 
-  Future<void> stopAndProcess() async {
-    // TODO: call AudioService.stopRecording(), upload, track pipeline status
-    state = state.copyWith(status: RecordingStatus.uploading);
-    await Future<void>.delayed(const Duration(milliseconds: 800));
-    state = state.copyWith(status: RecordingStatus.transcribing);
-    await Future<void>.delayed(const Duration(milliseconds: 800));
-    state = state.copyWith(status: RecordingStatus.analysing);
-    await Future<void>.delayed(const Duration(milliseconds: 800));
-    state = state.copyWith(status: RecordingStatus.generatingClip);
-    await Future<void>.delayed(const Duration(milliseconds: 800));
-    state = state.copyWith(status: RecordingStatus.complete);
+  /// Step 2: continue polling for analysis on an existing recordingId.
+  /// Called from ProcessingScreen after user taps "Analyse".
+  Future<void> continueAnalysis(String recordingId) async {
+    state = state.copyWith(
+      status: RecordingStatus.analysing,
+      recordingId: recordingId,
+    );
+
+    try {
+      while (true) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        final response = await _repo.getStatus(recordingId);
+        final mapped = _mapBackendStatus(response.status);
+
+        state = state.copyWith(
+          status: mapped,
+          transcript: response.transcript ?? state.transcript,
+          insight: response.insight,
+        );
+
+        if (response.isTerminal) break;
+      }
+
+      if (state.status != RecordingStatus.complete) {
+        state = state.copyWith(
+          status: RecordingStatus.error,
+          error: 'Processing failed. Please try again.',
+        );
+      } else {
+        _persistAlignmentSnapshot();
+      }
+    } catch (e) {
+      state = state.copyWith(
+        status: RecordingStatus.error,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Full pipeline (upload → transcribe → analyse). Used when skipping review.
+  Future<void> stopAndProcess(String audioPath) async {
+    state = state.copyWith(
+      status: RecordingStatus.uploading,
+      audioFilePath: audioPath,
+    );
+    try {
+      final recordingId = await _repo.uploadAudio(audioPath);
+      state = state.copyWith(
+        status: RecordingStatus.transcribing,
+        recordingId: recordingId,
+      );
+      while (true) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        final response = await _repo.getStatus(recordingId);
+        final mapped = _mapBackendStatus(response.status);
+        state = state.copyWith(
+          status: mapped,
+          transcript: response.transcript ?? state.transcript,
+          insight: response.insight,
+        );
+        if (response.isTerminal) break;
+      }
+      if (state.status != RecordingStatus.complete) {
+        state = state.copyWith(
+          status: RecordingStatus.error,
+          error: 'Processing failed. Please try again.',
+        );
+      } else {
+        _persistAlignmentSnapshot();
+      }
+    } catch (e) {
+      state = state.copyWith(
+        status: RecordingStatus.error,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Tras analizar desde la revisión de transcripción (sin subir audio).
+  void setAnalysedInsight(InsightEntity insight, {String? transcript}) {
+    state = state.copyWith(
+      status: RecordingStatus.complete,
+      insight: insight,
+      transcript: transcript ?? state.transcript,
+    );
+    _persistAlignmentSnapshot();
   }
 
   void reset() => state = const RecordingState();
+
+  RecordingStatus _mapBackendStatus(String s) => switch (s) {
+        'UPLOADING' => RecordingStatus.uploading,
+        'TRANSCRIBING' => RecordingStatus.transcribing,
+        'ANALYZING' => RecordingStatus.analysing,
+        'GENERATING_CLIP' => RecordingStatus.generatingClip,
+        'COMPLETE' => RecordingStatus.complete,
+        _ => RecordingStatus.error,
+      };
 }
 
-final recordingProvider = NotifierProvider<RecordingNotifier, RecordingState>(RecordingNotifier.new);
+final recordingProvider =
+    NotifierProvider<RecordingNotifier, RecordingState>(RecordingNotifier.new);
+
+final recordingRepositoryProvider = Provider<RecordingRepository>((ref) {
+  final dio = ref.watch(dioProvider);
+  return ApiRecordingRepository(dio);
+});
