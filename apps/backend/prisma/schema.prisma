@@ -27,6 +27,13 @@ enum SubscriptionTier {
   ENTERPRISE
 }
 
+enum AlignmentLevel {
+  CLEAR_PROGRESS
+  PARTIAL_PROGRESS
+  NO_EVIDENCE
+  DEVIATION
+}
+
 // Models
 model User {
   id             String   @id @default(cuid())
@@ -42,6 +49,7 @@ model User {
 
   recordings    Recording[]
   notifications Notification[]
+  goals         Goal[]
 
   @@index([createdAt])
 }
@@ -96,6 +104,8 @@ model Insight {
   keyThemes      Json // ["theme1", "theme2", ...]
   suggestedActions Json? // [{ action: "...", priority: "high" }, ...]
   sentiment      String // POSITIVE, NEUTRAL, NEGATIVE
+  overallAlignment Float?
+  goalAlignments   GoalAlignment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -137,4 +147,37 @@ model Notification {
   @@index([userId])
   @@index([createdAt])
   @@index([read])
+}
+
+model Goal {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title     String
+  active    Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  alignments GoalAlignment[]
+
+  @@index([userId])
+}
+
+model GoalAlignment {
+  id        String         @id @default(cuid())
+  insightId String
+  insight   Insight        @relation(fields: [insightId], references: [id], onDelete: Cascade)
+  goalId    String
+  goal      Goal           @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  score     Float
+  level     AlignmentLevel
+  reason    String
+
+  createdAt DateTime @default(now())
+
+  @@unique([insightId, goalId])
+  @@index([insightId])
 }
