@@ -45,7 +45,7 @@ class ApiGoalsRepository implements GoalsRepository {
 
   @override
   Future<void> deleteGoal(String id) async {
-    await _dio.delete('/goals/$id');
+    await _dio.delete<void>('/goals/$id');
   }
 
   @override
