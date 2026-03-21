@@ -14,6 +14,7 @@ import { AuthModule } from '@modules/auth/auth.module';
 import { AudioModule } from '@modules/audio/audio.module';
 import { TranscriptionModule } from '@modules/transcription/transcription.module';
 import { AnalysisModule } from '@modules/analysis/analysis.module';
+import { GoalsModule } from '@modules/goals/goals.module';
 import { ClipsModule } from '@modules/clips/clips.module';
 import { HistoryModule } from '@modules/history/history.module';
 import { SubscriptionsModule } from '@modules/subscriptions/subscriptions.module';
@@ -34,6 +35,7 @@ import { AppService } from './app.service';
     AudioModule,
     TranscriptionModule,
     AnalysisModule,
+    GoalsModule,
     ClipsModule,
     HistoryModule,
     SubscriptionsModule,
