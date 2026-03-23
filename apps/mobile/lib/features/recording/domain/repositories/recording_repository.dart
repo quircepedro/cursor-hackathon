@@ -20,7 +20,7 @@ class RecordingStatusResponse {
 }
 
 abstract class RecordingRepository {
-  Future<String> uploadAudio(String filePath);
+  Future<String> uploadAudio(String filePath, {String transcript});
   Future<RecordingStatusResponse> getStatus(String recordingId);
   Future<List<RecordingEntryEntity>> getRecordings();
 

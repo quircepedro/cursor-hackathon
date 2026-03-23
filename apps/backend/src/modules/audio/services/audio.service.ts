@@ -2,7 +2,6 @@ import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nest
 import type { User } from '@prisma/client';
 import { RecordingStatus } from '@prisma/client';
 import { PrismaService } from '@database/prisma.service';
-import { TranscriptionService } from '@modules/transcription/services/transcription.service';
 import { AnalysisService } from '@modules/analysis/services/analysis.service';
 import { GoalsService } from '@modules/goals/services/goals.service';
 import { StorageService } from '@modules/storage/storage.service';
@@ -16,7 +15,6 @@ export class AudioService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly transcription: TranscriptionService,
     private readonly analysis: AnalysisService,
     private readonly goalsService: GoalsService,
     private readonly storage: StorageService,
@@ -25,6 +23,7 @@ export class AudioService {
   async upload(
     user: User,
     file: Express.Multer.File,
+    clientTranscript?: string,
   ): Promise<{ id: string; status: string }> {
     const ext = path.extname(file.originalname) || '.m4a';
     const tmpPath = path.join(os.tmpdir(), `votio_${Date.now()}${ext}`);
@@ -42,7 +41,7 @@ export class AudioService {
       },
     });
 
-    void this.runPipeline(recording.id, tmpPath, user.id, ext);
+    void this.runPipeline(recording.id, tmpPath, user.id, ext, clientTranscript ?? '');
 
     return { id: recording.id, status: recording.status };
   }
@@ -102,6 +101,7 @@ export class AudioService {
     audioPath: string,
     userId: string,
     ext: string,
+    transcript: string,
   ): Promise<void> {
     try {
       // Step 1: Upload to R2
@@ -111,20 +111,20 @@ export class AudioService {
         where: { id: recordingId },
         data: { audioUrl: s3Key },
       });
+      this.logger.log(`Audio uploaded to R2: ${s3Key}`);
 
-      // Step 2: Transcribe (client-side — returns empty string)
+      // Step 2: Save transcription
       await this.setStatus(recordingId, RecordingStatus.TRANSCRIBING);
-      const text = await this.transcription.transcribe(audioPath);
       await this.prisma.transcription.create({
-        data: { recordingId, text, language: 'auto' },
+        data: { recordingId, text: transcript, language: 'auto' },
       });
 
       // Step 3: Fetch user's goals
       const goals = await this.goalsService.findActive(userId);
 
-      // Step 4: Analyse with Gemini (emotion + goal alignment)
+      // Step 4: Analyse with Gemini (uses client transcript)
       await this.setStatus(recordingId, RecordingStatus.ANALYZING);
-      const result = await this.analysis.analyseJournal(text, goals);
+      const result = await this.analysis.analyseJournal(transcript, goals);
 
       // Step 5: Save Insight
       const insight = await this.prisma.insight.create({

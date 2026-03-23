@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
+import '../../../../core/services/journal_audio_storage.dart';
 import '../../../goals/application/providers/goals_provider.dart';
 import '../../application/providers/recording_provider.dart';
 
@@ -34,6 +35,12 @@ class _TranscriptionReviewScreenState
     try {
       final repo = ref.read(recordingRepositoryProvider);
       final goals = ref.read(goalsProvider).goals;
+
+      // Upload audio + transcript to backend (R2 storage + server-side analysis)
+      final audioPath = await JournalAudioStorage().pathForToday();
+      await repo.uploadAudio(audioPath, transcript: widget.transcript);
+
+      // Also get immediate insight for the current session
       final insight = await repo.analyseJournal(
         widget.transcript,
         goals: goals,

@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Param,
+  Body,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -23,8 +24,9 @@ export class AudioController {
   upload(
     @CurrentUser() user: User,
     @UploadedFile() file: Express.Multer.File,
+    @Body('transcript') transcript?: string,
   ) {
-    return this.audioService.upload(user, file);
+    return this.audioService.upload(user, file, transcript);
   }
 
   @Get()

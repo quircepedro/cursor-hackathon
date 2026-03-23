@@ -11,10 +11,11 @@ class ApiRecordingRepository implements RecordingRepository {
   final Dio _dio;
 
   @override
-  Future<String> uploadAudio(String filePath) async {
+  Future<String> uploadAudio(String filePath, {String transcript = ''}) async {
     final fileName = filePath.split('/').last;
     final formData = FormData.fromMap({
       'audio': await MultipartFile.fromFile(filePath, filename: fileName),
+      if (transcript.isNotEmpty) 'transcript': transcript,
     });
 
     final response = await _dio.post<Map<String, dynamic>>(
