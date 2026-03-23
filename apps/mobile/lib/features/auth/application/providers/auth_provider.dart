@@ -48,9 +48,19 @@ class AuthState {
 // ─── Notifier ────────────────────────────────────────────────────────────────
 
 class AuthNotifier extends StreamNotifier<AuthState> {
+  String? _lastUserId;
+
   @override
   Stream<AuthState> build() {
     return ref.watch(authRepositoryProvider).authStateChanges().map((firebaseUser) {
+      final nextUserId = firebaseUser?.uid;
+      if (_lastUserId != nextUserId) {
+        _lastUserId = nextUserId;
+        // Ensure account-scoped recording state is cleared when switching users.
+        ref.invalidate(todayRecordingProvider);
+        ref.read(recordingProvider.notifier).reset();
+      }
+
       if (firebaseUser == null) {
         return const AuthState(status: AuthStatus.unauthenticated);
       }
