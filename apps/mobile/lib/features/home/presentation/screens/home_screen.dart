@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
+import '../../../../core/services/journal_audio_storage.dart';
 import '../../../goals/application/providers/goals_provider.dart';
 import '../../../recording/application/providers/recording_provider.dart';
+import '../../../recording/presentation/widgets/journal_audio_player.dart';
 import '../../../history/application/providers/history_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -27,6 +29,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   late Animation<Offset> _contentSlide;
   late Animation<Offset> _navSlide;
   late Animation<double> _exitFade;
+
+  // Persistent check: does today's audio clip exist on disk?
+  final _audioStorage = JournalAudioStorage();
+  bool _hasTodayClip = false;
 
   @override
   void initState() {
@@ -56,6 +62,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _navSlide = Tween<Offset>(begin: Offset.zero, end: const Offset(0, 1.2))
         .animate(curve);
     _exitFade = Tween<double>(begin: 1, end: 0).animate(curve);
+
+    _checkTodayClip();
+  }
+
+  Future<void> _checkTodayClip() async {
+    final exists = await _audioStorage.hasTodayClip();
+    if (mounted && exists != _hasTodayClip) {
+      setState(() => _hasTodayClip = exists);
+    }
   }
 
   @override
@@ -66,6 +81,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         _exitController.value > 0) {
       _exitController.reverse();
     }
+    // Re-check if today's clip exists (e.g. after returning from recording)
+    _checkTodayClip();
   }
 
   @override
@@ -90,7 +107,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final recordingState = ref.watch(recordingProvider);
     ref.watch(historyProvider);
 
-    final hasRecordedToday = recordingState.status == RecordingStatus.complete;
+    final hasRecordedToday =
+        _hasTodayClip || recordingState.status == RecordingStatus.complete;
     const streak = 5;
 
     final greeting =
@@ -162,7 +180,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ),
 
-            _buildBottomNav(context, hasRecordedToday),
           ],
         ),
       ),
@@ -217,7 +234,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
               const SizedBox(width: 12),
               GestureDetector(
-                onTap: () => context.push(RouteNames.settings),
+                onTap: () => context.go(RouteNames.settings),
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -639,49 +656,42 @@ extension _HomeScreenStateMethods on _HomeScreenState {
             style: TextStyle(color: Colors.grey[500], fontSize: 14),
           ),
           const SizedBox(height: 24),
-          GestureDetector(
-            onTap: () => context.push(RouteNames.recording),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                color: hasRecorded
-                    ? Colors.white.withOpacity(0.1)
-                    : Colors.white,
-                border: hasRecorded
-                    ? Border.all(color: Colors.white.withOpacity(0.2))
-                    : null,
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: hasRecorded
-                    ? []
-                    : [
-                        BoxShadow(
-                          color: Colors.white.withOpacity(0.2),
-                          blurRadius: 20,
-                        ),
-                      ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    hasRecorded ? Icons.play_arrow : Icons.mic,
-                    color: hasRecorded ? Colors.white : Colors.black,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    ctaText,
-                    style: TextStyle(
-                      color: hasRecorded ? Colors.white : Colors.black,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+          if (hasRecorded) ...[
+            // Show inline audio player for today's clip
+            const JournalAudioPlayer(),
+          ] else
+            GestureDetector(
+              onTap: () => context.push(RouteNames.recording),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.2),
+                      blurRadius: 20,
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.mic, color: Colors.black, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Grabar tu día',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -775,7 +785,7 @@ extension _HomeScreenStateMethods on _HomeScreenState {
 
   Widget _buildHistoryButton(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.push(RouteNames.history),
+      onTap: () => context.go(RouteNames.history),
       child: Container(
         margin: const EdgeInsets.fromLTRB(24, 16, 24, 0),
         padding: const EdgeInsets.all(16),
@@ -810,91 +820,4 @@ extension _HomeScreenStateMethods on _HomeScreenState {
     );
   }
 
-  Widget _buildBottomNav(BuildContext context, bool hasRecorded) {
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: ClipRect(
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            height: 96,
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.5),
-              border:
-                  Border(top: BorderSide(color: Colors.white.withOpacity(0.05))),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildNavItem(Icons.circle, true, null),
-                  _buildNavItem(
-                    Icons.calendar_today,
-                    false,
-                    () => context.push(RouteNames.history),
-                  ),
-                  _buildNavItem(Icons.bar_chart, false, null,
-                      hasNotification: hasRecorded),
-                  _buildNavItem(
-                    Icons.person_outline,
-                    false,
-                    () => context.push(RouteNames.settings),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(
-    IconData icon,
-    bool isActive,
-    VoidCallback? onTap, {
-    bool hasNotification = false,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            child: icon == Icons.circle
-                ? Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                    ),
-                  )
-                : Icon(
-                    icon,
-                    color: isActive ? Colors.white : Colors.grey[600],
-                    size: 24,
-                  ),
-          ),
-          if (hasNotification)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF6366F1),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 }

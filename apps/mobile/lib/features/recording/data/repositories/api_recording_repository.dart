@@ -52,12 +52,7 @@ class ApiRecordingRepository implements RecordingRepository {
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/analysis/journal',
-      data: {
-        'transcript': transcript,
-        'goals': [
-          for (final g in goals) {'title': g.title},
-        ],
-      },
+      data: {'transcript': transcript},
       options: Options(
         sendTimeout: const Duration(minutes: 2),
         receiveTimeout: const Duration(minutes: 2),

@@ -5,10 +5,10 @@ enum AlignmentLevel {
   deviation;
 
   static AlignmentLevel fromString(String value) => switch (value) {
-        'CLEAR_PROGRESS' => AlignmentLevel.clearProgress,
-        'PARTIAL_PROGRESS' => AlignmentLevel.partialProgress,
-        'NO_EVIDENCE' => AlignmentLevel.noEvidence,
-        'DEVIATION' => AlignmentLevel.deviation,
+        'CLEAR_PROGRESS' || 'clearProgress' => AlignmentLevel.clearProgress,
+        'PARTIAL_PROGRESS' || 'partialProgress' => AlignmentLevel.partialProgress,
+        'NO_EVIDENCE' || 'noEvidence' => AlignmentLevel.noEvidence,
+        'DEVIATION' || 'deviation' => AlignmentLevel.deviation,
         _ => AlignmentLevel.noEvidence,
       };
 
@@ -45,4 +45,12 @@ class GoalAlignmentEntity {
       reason: json['reason'] as String? ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'goalId': goalId,
+        'goalTitle': goalTitle,
+        'score': score,
+        'level': level.name,
+        'reason': reason,
+      };
 }

@@ -18,4 +18,6 @@ abstract final class RouteNames {
   static const forgotPassword = '/forgot-password';
   static const goalsOnboarding = '/goals-onboarding';
   static const goals = '/goals';
+  static const todayInsights = '/today-insights';
+  static const chartsPreview = '/charts-preview';
 }

@@ -3,9 +3,11 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:record/record.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../../../app/router/route_names.dart';
+import '../../../../core/services/journal_audio_storage.dart';
 
 class RecordingScreen extends StatefulWidget {
   const RecordingScreen({
@@ -28,6 +30,8 @@ class _RecordingScreenState extends State<RecordingScreen>
   late final AnimationController _colorController;
 
   final _speech = SpeechToText();
+  final _audioRecorder = AudioRecorder();
+  final _audioStorage = JournalAudioStorage();
   bool _speechAvailable = false;
   bool _isRecording = false;
   bool _isBusy = false;
@@ -179,6 +183,7 @@ class _RecordingScreenState extends State<RecordingScreen>
     _watchdog?.cancel();
     _colorController.dispose();
     _speech.cancel();
+    _audioRecorder.dispose();
     super.dispose();
   }
 
@@ -193,6 +198,16 @@ class _RecordingScreenState extends State<RecordingScreen>
   }
 
   Future<void> _start() async {
+    // Re-initialize speech if the first attempt (in initState) failed —
+    // this happens on Android when the mic permission had not been granted yet
+    // at screen-load time. initialize() is cheap to call again once granted.
+    if (!_speechAvailable) {
+      _speechAvailable = await _speech.initialize(
+        onStatus: _onSpeechStatus,
+        onError: _onSpeechError,
+      );
+    }
+
     setState(() {
       _isRecording = true;
       _elapsed = Duration.zero;
@@ -210,7 +225,27 @@ class _RecordingScreenState extends State<RecordingScreen>
       }
     });
     _colorController.repeat(reverse: true);
+
+    // Start speech-to-text FIRST so it claims the mic before AudioRecorder.
     await _startListening();
+
+    // Start audio file recording after speech is listening.
+    // Use voiceRecognition audio source so Android allows concurrent capture
+    // alongside SpeechRecognizer (MediaRecorder.AudioSource.VOICE_RECOGNITION).
+    final tempPath = await _audioStorage.pathForToday();
+    if (await _audioRecorder.hasPermission()) {
+      await _audioRecorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          androidConfig: AndroidRecordConfig(
+            audioSource: AndroidAudioSource.voiceRecognition,
+            useLegacy: true,
+          ),
+        ),
+        path: tempPath,
+      );
+    }
   }
 
   Future<void> _stop() async {
@@ -225,6 +260,12 @@ class _RecordingScreenState extends State<RecordingScreen>
       _soundLevel = 0.0;
     });
     await _speech.stop();
+
+    // Stop audio file recording — file is already saved at the today path
+    if (await _audioRecorder.isRecording()) {
+      await _audioRecorder.stop();
+    }
+
     if (!mounted) return;
     final transcript = _fullTranscript.trim();
     context.pushReplacement(

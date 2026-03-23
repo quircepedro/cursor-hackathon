@@ -57,14 +57,10 @@ Future<String?> _firstPrivateLanIpv4() async {
 Future<bool> _tcpPortOpen(String host, int port) async {
   Socket? s;
   try {
-    // iPhone físico: Wi‑Fi + permiso «red local»; 200 ms suele ser poco fiable.
-    final timeout = Duration(
-      milliseconds: Platform.isIOS ? 900 : 500,
-    );
     s = await Socket.connect(
       host,
       port,
-      timeout: timeout,
+      timeout: const Duration(milliseconds: 200),
     );
     return true;
   } catch (_) {
@@ -95,7 +91,7 @@ Future<String?> _probeNestOnSubnet(String phoneIp) async {
   }
   candidates.sort((a, b) => prio(a).compareTo(prio(b)));
 
-  final batchSize = Platform.isIOS ? 20 : 32;
+  const batchSize = 32;
   for (var i = 0; i < candidates.length; i += batchSize) {
     final end = i + batchSize > candidates.length
         ? candidates.length
@@ -132,20 +128,6 @@ Future<String?> _tryDiscoverCachedOrScan() async {
     await prefs.setInt(_prefsDiscoveredTime, DateTime.now().millisecondsSinceEpoch);
   }
   return found;
-}
-
-/// Varios intentos: el permiso de red local en iOS puede concederse tras el primero.
-Future<String?> _discoverNestWithRetries() async {
-  for (var attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) {
-      await Future<void>.delayed(
-        Duration(milliseconds: attempt == 1 ? 450 : 1000),
-      );
-    }
-    final found = await _tryDiscoverCachedOrScan();
-    if (found != null) return found;
-  }
-  return null;
 }
 
 /// En emulador Android, 127.0.0.1/localhost → 10.0.2.2 (host del Mac).
@@ -187,7 +169,7 @@ Future<String> _replaceLoopbackOnPhysicalAndroid(
     } catch (_) {}
   }
 
-  final discovered = await _discoverNestWithRetries();
+  final discovered = await _tryDiscoverCachedOrScan();
   return discovered ?? url;
 }
 
@@ -209,18 +191,16 @@ Future<String> _replaceLoopbackOnPhysicalIos(String url) async {
     } catch (_) {}
   }
 
-  final discovered = await _discoverNestWithRetries();
+  final discovered = await _tryDiscoverCachedOrScan();
   return discovered ?? url;
 }
 
 /// Resuelve la URL del API en desarrollo.
 ///
-/// Prioridad: `dart-define=API_BASE_URL` → `API_BASE_URL` en `.env` →
-/// `DEV_MAC_LAN_IP` (solo móvil físico) → defaults por plataforma.
+/// Prioridad: `dart-define=API_BASE_URL` → `.env` → por plataforma.
 ///
-/// **Android físico / iPhone físico** con `127.0.0.1`: `--dart-define=VOTIO_LAN_HOST=`,
-/// o **descubre** en la Wi‑Fi un host con puerto 3000 (Nest), con reintentos para
-/// el permiso de red local en iOS.
+/// **Android físico / iPhone físico** con `127.0.0.1`: intenta `--dart-define=VOTIO_LAN_HOST=`
+/// o **descubre** en la Wi‑Fi un host con puerto 3000 abierto (Nest) y lo guarda 7 días.
 Future<String> resolveDevelopmentApiBaseUrlAsync() async {
   AndroidDeviceInfo? android;
 
@@ -239,53 +219,32 @@ Future<String> resolveDevelopmentApiBaseUrlAsync() async {
     if (fromEnv != null && fromEnv.isNotEmpty) {
       resolved = fromEnv;
     } else {
-      final devMacLan = dotenv.env['DEV_MAC_LAN_IP']?.trim();
       final plugin = DeviceInfoPlugin();
-      var usedDevMac = false;
-      if (devMacLan != null && devMacLan.isNotEmpty) {
-        if (Platform.isAndroid) {
-          final a = await loadAndroid();
-          final physical =
-              a.isPhysicalDevice && !_looksLikeAndroidEmulator(a);
-          if (physical) {
-            resolved = 'http://$devMacLan:3000/api/v1';
-            usedDevMac = true;
-          }
-        } else if (Platform.isIOS) {
-          final ios = await plugin.iosInfo;
-          if (ios.isPhysicalDevice) {
-            resolved = 'http://$devMacLan:3000/api/v1';
-            usedDevMac = true;
-          }
-        }
-      }
-      if (!usedDevMac) {
-        if (Platform.isAndroid) {
-          final a = await loadAndroid();
-          final asEmu = !a.isPhysicalDevice || _looksLikeAndroidEmulator(a);
-          if (asEmu) {
-            resolved = 'http://10.0.2.2:3000/api/v1';
-          } else {
-            const lanHost =
-                String.fromEnvironment('VOTIO_LAN_HOST', defaultValue: '');
-            resolved = lanHost.isNotEmpty
-                ? 'http://$lanHost:3000/api/v1'
-                : kDevelopmentPhysicalDeviceFallbackBaseUrl;
-          }
-        } else if (Platform.isIOS) {
-          final ios = await plugin.iosInfo;
-          if (!ios.isPhysicalDevice) {
-            resolved = 'http://127.0.0.1:3000/api/v1';
-          } else {
-            const lanHost =
-                String.fromEnvironment('VOTIO_LAN_HOST', defaultValue: '');
-            resolved = lanHost.isNotEmpty
-                ? 'http://$lanHost:3000/api/v1'
-                : kDevelopmentPhysicalDeviceFallbackBaseUrl;
-          }
+      if (Platform.isAndroid) {
+        final a = await loadAndroid();
+        final asEmu = !a.isPhysicalDevice || _looksLikeAndroidEmulator(a);
+        if (asEmu) {
+          resolved = 'http://10.0.2.2:3000/api/v1';
         } else {
-          resolved = 'http://127.0.0.1:3000/api/v1';
+          const lanHost =
+              String.fromEnvironment('VOTIO_LAN_HOST', defaultValue: '');
+          resolved = lanHost.isNotEmpty
+              ? 'http://$lanHost:3000/api/v1'
+              : kDevelopmentPhysicalDeviceFallbackBaseUrl;
         }
+      } else if (Platform.isIOS) {
+        final ios = await plugin.iosInfo;
+        if (!ios.isPhysicalDevice) {
+          resolved = 'http://127.0.0.1:3000/api/v1';
+        } else {
+          const lanHost =
+              String.fromEnvironment('VOTIO_LAN_HOST', defaultValue: '');
+          resolved = lanHost.isNotEmpty
+              ? 'http://$lanHost:3000/api/v1'
+              : kDevelopmentPhysicalDeviceFallbackBaseUrl;
+        }
+      } else {
+        resolved = 'http://127.0.0.1:3000/api/v1';
       }
     }
   }

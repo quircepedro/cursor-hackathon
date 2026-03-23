@@ -33,7 +33,8 @@ class ErrorInterceptor extends Interceptor {
     final detail = err.message;
     final tail = (detail != null && detail.isNotEmpty) ? ' ($detail)' : '';
     return 'No se pudo conectar con $uri.$tail '
-        'Comprueba internet y que API_BASE_URL apunte a tu API (HTTPS en release).';
+        'Comprueba internet, que API_BASE_URL en .env.development sea correcta '
+        'y, si usas Nest en tu Mac, que esté en marcha (npm run backend:dev).';
   }
 
   AppException _mapBadResponse(DioException err) {

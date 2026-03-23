@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
-import '../../../../app/theme/app_colors.dart';
+import '../../../auth/application/providers/auth_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -20,10 +20,30 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _navigate() async {
+    // Show splash for at least 1.5 seconds
     await Future<void>.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
-    // TODO: Check auth state and onboarding status
-    context.go(RouteNames.onboarding);
+
+    // Wait for auth state to resolve (up to 5 seconds)
+    final authState = ref.read(authProvider);
+    if (authState.isLoading) {
+      // Auth hasn't resolved yet — wait for it
+      await ref.read(authProvider.future).timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => const AuthState(status: AuthStatus.unauthenticated),
+          );
+      if (!mounted) return;
+    }
+
+    final status = ref.read(authProvider).valueOrNull?.status;
+    if (status == AuthStatus.authenticated) {
+      context.go(RouteNames.home);
+    } else if (status == AuthStatus.pendingVerification) {
+      context.go(RouteNames.verifyEmail);
+    } else {
+      // Unauthenticated or unknown — go to onboarding/login
+      context.go(RouteNames.onboarding);
+    }
   }
 
   @override

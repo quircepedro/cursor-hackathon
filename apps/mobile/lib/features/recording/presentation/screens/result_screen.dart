@@ -11,6 +11,7 @@ import '../../../goals/presentation/widgets/alignment_radar_chart.dart';
 import '../../../goals/presentation/widgets/alignment_trend_chart.dart';
 import '../../application/providers/recording_provider.dart';
 import '../../domain/entities/insight_entity.dart';
+import '../widgets/journal_audio_player.dart';
 
 class ResultScreen extends ConsumerWidget {
   const ResultScreen({super.key});
@@ -39,7 +40,9 @@ class ResultScreen extends ConsumerWidget {
                     children: [
                       if (insight != null) ...[
                         _SentimentBanner(insight: insight),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
+                        const JournalAudioPlayer(),
+                        const SizedBox(height: 16),
                         _SummaryCard(insight: insight),
                         const SizedBox(height: 16),
                         if (insight.keyThemes.isNotEmpty)

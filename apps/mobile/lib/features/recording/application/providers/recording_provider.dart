@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/services/journal_insight_storage.dart';
 import '../../../goals/application/providers/goals_provider.dart';
 import '../../data/repositories/api_recording_repository.dart';
 import '../../domain/entities/insight_entity.dart';
@@ -83,9 +84,15 @@ class RecordingNotifier extends Notifier<RecordingState> {
 
   RecordingRepository get _repo => ref.read(recordingRepositoryProvider);
 
+  final _insightStorage = JournalInsightStorage();
+
   void _persistAlignmentSnapshot() {
     final insight = state.insight;
     if (insight == null) return;
+
+    // Persist full insight for calendar/history view
+    unawaited(_insightStorage.saveToday(insight));
+
     final snapshot = insight.toAlignmentHistorySnapshot();
     if (snapshot == null) return;
     unawaited(

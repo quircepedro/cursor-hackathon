@@ -1,10 +1,8 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
-import '../../../../core/errors/app_exception.dart';
 import '../../../goals/application/providers/goals_provider.dart';
 import '../../application/providers/recording_provider.dart';
 
@@ -25,29 +23,6 @@ class _TranscriptionReviewScreenState
     extends ConsumerState<TranscriptionReviewScreen> {
   bool _isAnalysing = false;
   String? _error;
-
-  String _analyseErrorMessage(Object e) {
-    if (e is DioException) {
-      final inner = e.error;
-      if (inner is UnauthorizedException) {
-        return 'Sesión no válida. Cierra sesión y vuelve a entrar.';
-      }
-      if (inner is NotFoundException) {
-        return inner.message;
-      }
-      if (inner is NetworkException) {
-        return '${inner.message} Si usas release, revisa API_BASE_URL en .env.production '
-            'y que el backend esté desplegado y accesible por HTTPS.';
-      }
-      if (inner is ServerException) {
-        return 'El servidor no pudo analizar la entrada. Inténtalo más tarde.';
-      }
-      if (inner is AppException) {
-        return inner.message;
-      }
-    }
-    return 'No se pudo analizar. Revisa tu conexión e inténtalo de nuevo.';
-  }
 
   Future<void> _analyse() async {
     if (_isAnalysing) return;
@@ -71,7 +46,7 @@ class _TranscriptionReviewScreenState
       context.pushReplacement(RouteNames.result);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = _analyseErrorMessage(e));
+      setState(() => _error = 'No se pudo analizar. Revisa tu conexión.');
     } finally {
       if (mounted) setState(() => _isAnalysing = false);
     }

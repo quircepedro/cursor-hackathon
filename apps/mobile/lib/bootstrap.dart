@@ -54,9 +54,6 @@ Future<void> bootstrap({required AppEnvironment environment}) async {
 
   // Initialize logger
   LoggerService.init(config: config);
-  if (config.isDevelopment) {
-    LoggerService.instance.d('Votio dev API base: ${config.apiBaseUrl}');
-  }
 
   // Run the app
   runApp(

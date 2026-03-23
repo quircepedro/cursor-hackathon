@@ -1,8 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-
-/** Títulos de objetivos para el prompt (BD o cliente). */
-export type GoalPromptInput = { title: string };
+import type { Goal } from '@prisma/client';
 
 export interface GoalAlignmentResult {
   goalIndex: number;
@@ -24,17 +22,10 @@ export interface AnalysisResult {
   };
 }
 
-function escapeForPrompt(title: string): string {
-  return title.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-}
-
-function buildSystemPrompt(goals: GoalPromptInput[]): string {
-  const goalsSection =
-    goals.length === 0
-      ? '  (sin objetivos — devuelve goalAlignment.goals como [] y overallScore 0.)'
-      : goals
-          .map((g, i) => `  goal_${i}: "${escapeForPrompt(g.title)}"`)
-          .join('\n');
+function buildSystemPrompt(goals: Goal[]): string {
+  const goalsSection = goals
+    .map((g, i) => `  goal_${i}: "${g.title}"`)
+    .join('\n');
 
   return `Eres un analista experto integrado en una app de journaling diario por voz. Tu trabajo es analizar el transcript del usuario y devolver un JSON válido con dos secciones: análisis emocional y alineación con objetivos.
 
@@ -72,15 +63,21 @@ REGLAS PARA EL ANÁLISIS EMOCIONAL (campo "summary"):
 - Basa TODO en el transcript. No inventes ni asumas.
 - No uses listas ni títulos dentro del summary — prosa natural.
 
-REGLAS PARA ALINEACIÓN CON OBJETIVOS:
-- Analiza CADA objetivo del usuario (devuelve un entry por cada goal_N).
-- CLEAR_PROGRESS (score 0.7-1.0): el usuario mencionó acciones claras alineadas con el objetivo.
-- PARTIAL_PROGRESS (score 0.4-0.69): hubo mención o esfuerzo parcial pero incompleto.
-- NO_EVIDENCE (score 0.5): el transcript NO menciona nada sobre este objetivo. Sé prudente — si no hay evidencia, usa este nivel.
-- DEVIATION (score 0.0-0.39): el usuario mencionó acciones que contradicen el objetivo.
-- El campo "reason" DEBE citar o referenciar lo que el usuario dijo. Si no hay evidencia, di "No mencionaste nada sobre este objetivo en tu entrada de hoy."
+REGLAS CRÍTICAS PARA ALINEACIÓN CON OBJETIVOS:
+- Analiza CADA objetivo del usuario POR SEPARADO. Devuelve un entry por cada goal_N.
+- IMPORTANTE: Para cada objetivo, evalúa ÚNICAMENTE si el transcript contiene evidencia relacionada con ESE objetivo específico. NO mezcles los objetivos entre sí.
+- Para goal_0 ("${goals[0]?.title ?? ''}"), busca SOLO evidencia sobre "${goals[0]?.title ?? ''}" en el transcript.
+${goals.slice(1).map((g, i) => `- Para goal_${i + 1} ("${g.title}"), busca SOLO evidencia sobre "${g.title}" en el transcript.`).join('\n')}
+- Cada objetivo es INDEPENDIENTE. La evaluación de un objetivo NO debe afectar ni confundirse con la de otro.
+- El campo "reason" DEBE referirse al objetivo correcto por su título. Ejemplo: si el objetivo es "Ir al gimnasio", la razón debe hablar sobre ir al gimnasio, NO sobre otro objetivo.
+- CLEAR_PROGRESS (score 0.7-1.0): el usuario mencionó acciones claras alineadas con ESE objetivo específico.
+- PARTIAL_PROGRESS (score 0.4-0.69): hubo mención o esfuerzo parcial relacionado con ESE objetivo específico.
+- NO_EVIDENCE (score 0.5): el transcript NO menciona nada sobre ESE objetivo específico. Sé prudente — si no hay evidencia, usa este nivel.
+- DEVIATION (score 0.0-0.39): el usuario mencionó acciones que contradicen ESE objetivo específico.
+- El campo "reason" DEBE citar o referenciar lo que el usuario dijo. Si no hay evidencia, di "No mencionaste nada sobre [TÍTULO DEL OBJETIVO] en tu entrada de hoy." usando el título real del objetivo.
 - NO inventes hechos. NO asumas. Si no hay evidencia suficiente, devuelve NO_EVIDENCE.
 - overallScore es el promedio ponderado de los scores individuales.
+- VERIFICA antes de responder: ¿cada "reason" corresponde al objetivo correcto? ¿No estoy confundiendo un objetivo con otro?
 
 REGLA DE IDIOMA: Responde SIEMPRE en el mismo idioma del transcript (summary y reasons).`;
 }
@@ -95,10 +92,7 @@ export class AnalysisService {
     this.geminiApiKey = this.config.get<string>('GEMINI_API_KEY') ?? '';
   }
 
-  async analyseJournal(
-    transcript: string,
-    goals: GoalPromptInput[],
-  ): Promise<AnalysisResult> {
+  async analyseJournal(transcript: string, goals: Goal[]): Promise<AnalysisResult> {
     this.logger.log('Analysing journal transcript with Gemini (structured JSON)');
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.geminiModel}:generateContent?key=${this.geminiApiKey}`;
@@ -117,9 +111,6 @@ export class AnalysisService {
         temperature: 0.7,
         maxOutputTokens: 4096,
         responseMimeType: 'application/json',
-        thinkingConfig: {
-          thinkingBudget: 0,
-        },
       },
       safetySettings: [
         { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
@@ -169,7 +160,7 @@ export class AnalysisService {
     }
   }
 
-  private fallbackResult(goals: GoalPromptInput[]): AnalysisResult {
+  private fallbackResult(goals: Goal[]): AnalysisResult {
     return {
       emotion: {
         summary: 'No se ha podido generar un análisis para esta entrada.',

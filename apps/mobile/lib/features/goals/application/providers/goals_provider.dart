@@ -1,16 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../auth/application/providers/auth_provider.dart';
-import '../../data/repositories/local_goals_repository.dart';
+import '../../../../core/network/api_client.dart';
+import '../../data/repositories/api_goals_repository.dart';
 import '../../domain/entities/goal_entity.dart';
 import '../../domain/repositories/goals_repository.dart';
 
-// Repository provider
+// Repository provider — uses backend API so goals are available for server-side analysis.
 final goalsRepositoryProvider = Provider<GoalsRepository>((ref) {
-  final uid = ref.watch(authProvider).valueOrNull?.userId;
-  final scope =
-      (uid != null && uid.isNotEmpty) ? uid : '_anon';
-  return LocalGoalsRepository(scope);
+  final dio = ref.watch(dioProvider);
+  return ApiGoalsRepository(dio);
 });
 
 // Goals state
@@ -48,7 +46,9 @@ class GoalsNotifier extends Notifier<GoalsState> {
   Future<void> loadGoals() async {
     state = state.copyWith(status: GoalsStatus.loading);
     try {
-      final goals = await _repo.getActiveGoals();
+      final goals = await _repo.getActiveGoals().timeout(
+            const Duration(seconds: 8),
+          );
       state = GoalsState(
         status: goals.isEmpty ? GoalsStatus.noGoals : GoalsStatus.hasGoals,
         goals: goals,

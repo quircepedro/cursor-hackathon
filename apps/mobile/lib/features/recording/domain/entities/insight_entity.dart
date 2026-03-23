@@ -44,6 +44,16 @@ class InsightEntity {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+        'summary': summary,
+        'emotionScores': emotionScores,
+        'keyThemes': keyThemes,
+        'sentiment': sentiment,
+        if (suggestedActions != null) 'suggestedActions': suggestedActions,
+        if (overallAlignment != null) 'overallAlignment': overallAlignment,
+        'goalAlignments': goalAlignments.map((a) => a.toJson()).toList(),
+      };
+
   /// The dominant emotion (highest score).
   String get dominantEmotion {
     if (emotionScores.isEmpty) return 'neutral';

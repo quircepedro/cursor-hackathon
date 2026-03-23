@@ -21,14 +21,7 @@ export class AnalysisController {
   @Post('journal')
   @UseGuards(FirebaseAuthGuard)
   async analyseJournal(@CurrentUser() user: User, @Body() dto: AnalyseJournalDto) {
-    const fromClient =
-      dto.goals?.map((g) => g.title.trim()).filter((t) => t.length > 0) ?? [];
-    const goalsForPrompt =
-      fromClient.length > 0
-        ? fromClient.map((title) => ({ title }))
-        : (await this.goalsService.findActive(user.id)).map((g) => ({
-            title: g.title,
-          }));
-    return this.analysisService.analyseJournal(dto.transcript, goalsForPrompt);
+    const goals = await this.goalsService.findActive(user.id);
+    return this.analysisService.analyseJournal(dto.transcript, goals);
   }
 }
