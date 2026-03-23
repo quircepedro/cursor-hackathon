@@ -4,6 +4,7 @@ import {
   Post,
   Param,
   Body,
+  Query,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -25,13 +26,34 @@ export class AudioController {
     @CurrentUser() user: User,
     @UploadedFile() file: Express.Multer.File,
     @Body('transcript') transcript?: string,
+    @Body('tzOffsetMinutes') tzOffsetMinutes?: string,
   ) {
-    return this.audioService.upload(user, file, transcript);
+    const parsed =
+      tzOffsetMinutes !== undefined ? Number.parseInt(tzOffsetMinutes, 10) : undefined;
+    return this.audioService.upload(
+      user,
+      file,
+      transcript,
+      Number.isNaN(parsed) ? undefined : parsed,
+    );
   }
 
   @Get()
   getAll(@CurrentUser() user: User) {
     return this.audioService.getAll(user.id);
+  }
+
+  @Get('today')
+  getToday(
+    @CurrentUser() user: User,
+    @Query('tzOffsetMinutes') tzOffsetMinutes?: string,
+  ) {
+    const parsedOffset =
+      tzOffsetMinutes !== undefined ? Number.parseInt(tzOffsetMinutes, 10) : undefined;
+    return this.audioService.getToday(
+      user.id,
+      Number.isNaN(parsedOffset) ? undefined : parsedOffset,
+    );
   }
 
   @Get(':id')

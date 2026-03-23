@@ -13,9 +13,11 @@ class ApiRecordingRepository implements RecordingRepository {
   @override
   Future<String> uploadAudio(String filePath, {String transcript = ''}) async {
     final fileName = filePath.split('/').last;
+    final tzOffsetMinutes = DateTime.now().timeZoneOffset.inMinutes;
     final formData = FormData.fromMap({
       'audio': await MultipartFile.fromFile(filePath, filename: fileName),
       if (transcript.isNotEmpty) 'transcript': transcript,
+      'tzOffsetMinutes': tzOffsetMinutes.toString(),
     });
 
     final response = await _dio.post<Map<String, dynamic>>(
@@ -41,6 +43,26 @@ class ApiRecordingRepository implements RecordingRepository {
     return list
         .map((e) => RecordingEntryEntity.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  @override
+  Future<TodayRecordingResponse?> getTodayRecording() async {
+    final tzOffsetMinutes = DateTime.now().timeZoneOffset.inMinutes;
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/audio/today',
+      queryParameters: {'tzOffsetMinutes': tzOffsetMinutes},
+    );
+    final raw = response.data!;
+    final dynamic data = raw['data'];
+    if (data == null) return null;
+    final body = data as Map<String, dynamic>;
+    final insightRaw = body['insight'] as Map<String, dynamic>?;
+    return TodayRecordingResponse(
+      id: body['id'] as String,
+      status: body['status'] as String,
+      audioStreamUrl: body['audioStreamUrl'] as String?,
+      insight: insightRaw != null ? InsightEntity.fromJson(insightRaw) : null,
+    );
   }
 
   @override

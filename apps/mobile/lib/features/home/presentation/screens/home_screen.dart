@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -5,9 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
-import '../../../../core/services/journal_audio_storage.dart';
 import '../../../goals/application/providers/goals_provider.dart';
 import '../../../recording/application/providers/recording_provider.dart';
+import '../../../recording/domain/repositories/recording_repository.dart';
 import '../../../recording/presentation/widgets/journal_audio_player.dart';
 import '../../../history/application/providers/history_provider.dart';
 
@@ -19,7 +20,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _morphController;
   late AnimationController _pulseController;
   late AnimationController _exitController;
@@ -30,13 +31,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   late Animation<Offset> _navSlide;
   late Animation<double> _exitFade;
 
-  // Persistent check: does today's audio clip exist on disk?
-  final _audioStorage = JournalAudioStorage();
-  bool _hasTodayClip = false;
+  Timer? _pollTimer;
+  bool _isPolling = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     _morphController = AnimationController(
       vsync: this,
@@ -63,30 +64,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         .animate(curve);
     _exitFade = Tween<double>(begin: 1, end: 0).animate(curve);
 
-    _checkTodayClip();
-  }
-
-  Future<void> _checkTodayClip() async {
-    final exists = await _audioStorage.hasTodayClip();
-    if (mounted && exists != _hasTodayClip) {
-      setState(() => _hasTodayClip = exists);
-    }
+    _refreshToday();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Reverse exit animation when this route becomes active again (e.g. pop from recording)
     if (ModalRoute.of(context)?.isCurrent == true &&
         _exitController.value > 0) {
       _exitController.reverse();
     }
-    // Re-check if today's clip exists (e.g. after returning from recording)
-    _checkTodayClip();
+    _refreshToday();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshToday();
+    }
+  }
+
+  void _refreshToday() {
+    unawaited(ref.read(todayRecordingProvider.notifier).refresh());
+  }
+
+  void _startPollingIfNeeded(TodayRecordingResponse? today) {
+    final shouldPoll = today != null && !today.isComplete;
+    if (shouldPoll && !_isPolling) {
+      _isPolling = true;
+      _pollTimer?.cancel();
+      _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+        if (!mounted) return;
+        _refreshToday();
+      });
+    } else if (!shouldPoll && _isPolling) {
+      _isPolling = false;
+      _pollTimer?.cancel();
+      _pollTimer = null;
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pollTimer?.cancel();
     _morphController.dispose();
     _pulseController.dispose();
     _exitController.dispose();
@@ -95,30 +116,66 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Future<void> _onBlobTap() async {
     if (_exitController.isAnimating || _exitController.value == 1) return;
+
+    final todayAsync = ref.read(todayRecordingProvider);
+    final serverRecorded = todayAsync.valueOrNull != null;
+    final localComplete =
+        ref.read(recordingProvider).status == RecordingStatus.complete;
+    if (serverRecorded || localComplete) return;
+
     await _exitController.forward();
-    if (mounted) context.push(
-      RouteNames.recording,
-      extra: (_morphController.value, _pulseController.value),
-    );
+    if (mounted) {
+      unawaited(context.push(
+        RouteNames.recording,
+        extra: (_morphController.value, _pulseController.value),
+      ));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final recordingState = ref.watch(recordingProvider);
     ref.watch(historyProvider);
+    final todayAsync = ref.watch(todayRecordingProvider);
+
+    final todayData = todayAsync.valueOrNull;
+    final isServerLoading = todayAsync.isLoading && !todayAsync.hasValue;
+    final hasError = todayAsync.hasError && !todayAsync.hasValue;
 
     final hasRecordedToday =
-        _hasTodayClip || recordingState.status == RecordingStatus.complete;
+        todayData != null || recordingState.status == RecordingStatus.complete;
+    final todayComplete = todayData?.isComplete == true;
     const streak = 5;
 
-    final greeting =
-        hasRecordedToday ? '¡Día completado!' : '¿Cómo ha sido tu día?';
-    final statusText = hasRecordedToday
-        ? 'Tu clip de hoy está listo'
-        : 'Aún no has registrado tu día';
-    final subStatus = hasRecordedToday
-        ? 'Has procesado tus emociones con éxito hoy.'
-        : 'Registra tu día para mantener tu racha.';
+    // Start/stop polling based on recording state
+    _startPollingIfNeeded(todayData);
+
+    final showPendingCheck = isServerLoading && !hasRecordedToday;
+    final String greeting;
+    final String statusText;
+    final String subStatus;
+
+    if (hasRecordedToday) {
+      greeting = todayComplete ? '¡Día completado!' : 'Procesando tu grabación...';
+      statusText = todayComplete
+          ? 'Tu clip de hoy está listo'
+          : 'Estamos analizando tu audio';
+      subStatus = todayComplete
+          ? 'Has procesado tus emociones con éxito hoy.'
+          : 'Esto tardará solo un momento.';
+    } else if (showPendingCheck) {
+      greeting = 'Sincronizando tu día...';
+      statusText = 'Consultando tu grabación de hoy...';
+      subStatus = 'Estamos actualizando tu estado en el servidor.';
+    } else if (hasError) {
+      greeting = '¿Cómo ha sido tu día?';
+      statusText = 'Error al consultar el servidor';
+      subStatus = 'Pulsa el botón de abajo para reintentar.';
+    } else {
+      greeting = '¿Cómo ha sido tu día?';
+      statusText = 'Aún no has registrado tu día';
+      subStatus = 'Registra tu día para mantener tu racha.';
+    }
     final ctaText = hasRecordedToday ? 'Reproducir clip de hoy' : 'Grabar tu día';
     final auraColors = hasRecordedToday
         ? [const Color(0xFF34D399), const Color(0xFF14B8A6), const Color(0xFF06B6D4)]
@@ -130,13 +187,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         child: Stack(
           children: [
             SingleChildScrollView(
-              // Disable scroll while animating so the user can't interfere
               physics: _exitController.isAnimating
                   ? const NeverScrollableScrollPhysics()
                   : null,
               child: Column(
                 children: [
-                  // ── Header + greeting: slide UP and fade ──
                   SlideTransition(
                     position: _headerSlide,
                     child: FadeTransition(
@@ -150,10 +205,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                   ),
 
-                  // ── Blob: stays in place, only gets GestureDetector ──
                   _buildAuraVisual(auraColors),
 
-                  // ── Content below blob: slide DOWN and fade ──
                   SlideTransition(
                     position: _contentSlide,
                     child: FadeTransition(
@@ -166,10 +219,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             statusText,
                             subStatus,
                             ctaText,
-                            hasRecordedToday,
+                            hasRecordedToday: hasRecordedToday,
+                            todayComplete: todayComplete,
+                            isLoading: isServerLoading,
+                            hasError: hasError,
+                            audioUrl: todayData?.audioStreamUrl,
                           ),
                           _buildGoalsCard(context),
-                          if (hasRecordedToday) _buildInsightCard(),
+                          if (hasRecordedToday)
+                            _buildInsightCard(todayData?.insight?.summary),
                           if (hasRecordedToday) _buildHistoryButton(context),
                           const SizedBox(height: 120),
                         ],
@@ -633,9 +691,13 @@ extension _HomeScreenStateMethods on _HomeScreenState {
     BuildContext context,
     String statusText,
     String subStatus,
-    String ctaText,
-    bool hasRecorded,
-  ) {
+    String ctaText, {
+    required bool hasRecordedToday,
+    required bool todayComplete,
+    required bool isLoading,
+    required bool hasError,
+    String? audioUrl,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -656,9 +718,77 @@ extension _HomeScreenStateMethods on _HomeScreenState {
             style: TextStyle(color: Colors.grey[500], fontSize: 14),
           ),
           const SizedBox(height: 24),
-          if (hasRecorded) ...[
-            // Show inline audio player for today's clip
-            const JournalAudioPlayer(),
+          if (isLoading && !hasRecordedToday) ...[
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFF6366F1),
+              ),
+            ),
+          ] else if (hasError && !hasRecordedToday) ...[
+            GestureDetector(
+              onTap: _refreshToday,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF151518),
+                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.refresh, color: Colors.grey[400], size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Reintentar',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ] else if (hasRecordedToday && todayComplete) ...[
+            JournalAudioPlayer(audioUrl: audioUrl),
+          ] else if (hasRecordedToday && !todayComplete) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF151518),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFF6366F1),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Procesando tu audio...',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ] else
             GestureDetector(
               onTap: () => context.push(RouteNames.recording),
@@ -697,7 +827,7 @@ extension _HomeScreenStateMethods on _HomeScreenState {
     );
   }
 
-  Widget _buildInsightCard() {
+  Widget _buildInsightCard(String? summary) {
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 32, 24, 0),
       child: Column(
@@ -765,7 +895,9 @@ extension _HomeScreenStateMethods on _HomeScreenState {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Hoy detectamos mucha energía positiva y resolución en tu tono de voz.',
+                      summary?.trim().isNotEmpty == true
+                          ? summary!
+                          : 'Tu entrada ha sido registrada. Los insights estarán disponibles en breve.',
                       style: TextStyle(
                         color: Colors.grey[300],
                         fontSize: 14,

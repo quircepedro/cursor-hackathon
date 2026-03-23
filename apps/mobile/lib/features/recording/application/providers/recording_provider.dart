@@ -243,6 +243,17 @@ class RecordingNotifier extends Notifier<RecordingState> {
     _persistAlignmentSnapshot();
   }
 
+  void setPendingServerAnalysis({
+    required String recordingId,
+    required String transcript,
+  }) {
+    state = state.copyWith(
+      status: RecordingStatus.analysing,
+      recordingId: recordingId,
+      transcript: transcript,
+    );
+  }
+
   void reset() => state = const RecordingState();
 
   RecordingStatus _mapBackendStatus(String s) => switch (s) {
@@ -262,3 +273,41 @@ final recordingRepositoryProvider = Provider<RecordingRepository>((ref) {
   final dio = ref.watch(dioProvider);
   return ApiRecordingRepository(dio);
 });
+
+// ─── Today Recording (server-based) ─────────────────────────────────────────
+
+class TodayRecordingNotifier extends AsyncNotifier<TodayRecordingResponse?> {
+  @override
+  Future<TodayRecordingResponse?> build() async {
+    final repo = ref.read(recordingRepositoryProvider);
+    return repo.getTodayRecording();
+  }
+
+  /// Re-fetch from server. Keeps the previous value visible during load
+  /// to avoid a flash of "no recording" while the request is in flight.
+  Future<void> refresh() async {
+    final previous = state;
+    state = const AsyncValue<TodayRecordingResponse?>.loading()
+        .copyWithPrevious(previous);
+    state = await AsyncValue.guard(
+      () => ref.read(recordingRepositoryProvider).getTodayRecording(),
+    );
+  }
+
+  /// Optimistically mark that a recording exists for today (before server
+  /// confirms COMPLETE). This avoids the "no recording" flash when returning
+  /// to the home screen right after uploading.
+  void markUploaded(String recordingId) {
+    state = AsyncValue.data(
+      TodayRecordingResponse(
+        id: recordingId,
+        status: 'UPLOADING',
+      ),
+    );
+  }
+}
+
+final todayRecordingProvider =
+    AsyncNotifierProvider<TodayRecordingNotifier, TodayRecordingResponse?>(
+  TodayRecordingNotifier.new,
+);

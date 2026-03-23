@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
 import '../../../../core/services/journal_audio_storage.dart';
-import '../../../goals/application/providers/goals_provider.dart';
 import '../../application/providers/recording_provider.dart';
 
 class TranscriptionReviewScreen extends ConsumerStatefulWidget {
@@ -34,23 +33,24 @@ class _TranscriptionReviewScreenState
 
     try {
       final repo = ref.read(recordingRepositoryProvider);
-      final goals = ref.read(goalsProvider).goals;
+      final notifier = ref.read(recordingProvider.notifier);
 
-      // Upload audio + transcript to backend (R2 storage + server-side analysis)
+      // Upload to backend and continue with server-side processing only.
       final audioPath = await JournalAudioStorage().pathForToday();
-      await repo.uploadAudio(audioPath, transcript: widget.transcript);
-
-      // Also get immediate insight for the current session
-      final insight = await repo.analyseJournal(
-        widget.transcript,
-        goals: goals,
+      final recordingId = await repo.uploadAudio(
+        audioPath,
+        transcript: widget.transcript,
       );
       if (!mounted) return;
-      ref.read(recordingProvider.notifier).setAnalysedInsight(
-            insight,
-            transcript: widget.transcript,
-          );
-      context.pushReplacement(RouteNames.result);
+
+      // Optimistically mark today's recording so HomeScreen sees it immediately
+      ref.read(todayRecordingProvider.notifier).markUploaded(recordingId);
+
+      notifier.setPendingServerAnalysis(
+        recordingId: recordingId,
+        transcript: widget.transcript,
+      );
+      context.pushReplacement(RouteNames.processing, extra: recordingId);
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = 'No se pudo analizar. Revisa tu conexión.');

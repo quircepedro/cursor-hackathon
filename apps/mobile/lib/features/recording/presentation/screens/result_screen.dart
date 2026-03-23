@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,18 +22,24 @@ class ResultScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final insight = ref.watch(recordingProvider).insight;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF050505),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text('Your insight', style: TextStyle(color: Colors.white)),
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          unawaited(ref.read(todayRecordingProvider.notifier).refresh());
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF050505),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Your insight', style: TextStyle(color: Colors.white)),
+          iconTheme: const IconThemeData(color: Colors.white),
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
             children: [
               Expanded(
                 child: SingleChildScrollView(
@@ -86,6 +94,7 @@ class ResultScreen extends ConsumerWidget {
               ),
               ElevatedButton(
                 onPressed: () {
+                  unawaited(ref.read(todayRecordingProvider.notifier).refresh());
                   ref.read(recordingProvider.notifier).reset();
                   context.go(RouteNames.home);
                 },
@@ -101,6 +110,7 @@ class ResultScreen extends ConsumerWidget {
                     style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
+            ),
           ),
         ),
       ),

@@ -24,7 +24,16 @@ export class AudioService {
     user: User,
     file: Express.Multer.File,
     clientTranscript?: string,
+    tzOffsetMinutes?: number,
   ): Promise<{ id: string; status: string }> {
+    const existingToday = await this.findTodayRecording(user.id, tzOffsetMinutes);
+    if (
+      existingToday &&
+      existingToday.status !== RecordingStatus.FAILED
+    ) {
+      throw new ForbiddenException('You already recorded today');
+    }
+
     const ext = path.extname(file.originalname) || '.m4a';
     const tmpPath = path.join(os.tmpdir(), `votio_${Date.now()}${ext}`);
     fs.writeFileSync(tmpPath, file.buffer);
@@ -92,6 +101,26 @@ export class AudioService {
     if (recording.userId !== userId) throw new ForbiddenException();
 
     return recording;
+  }
+
+  async getToday(userId: string, tzOffsetMinutes?: number) {
+    const recording = await this.findTodayRecording(userId, tzOffsetMinutes);
+    if (!recording || recording.status === RecordingStatus.FAILED) {
+      return null;
+    }
+
+    const isComplete = recording.status === RecordingStatus.COMPLETE;
+    return {
+      id: recording.id,
+      title: recording.title,
+      createdAt: recording.createdAt,
+      status: recording.status,
+      audioStreamUrl:
+        isComplete && recording.audioUrl
+          ? await this.storage.getSignedUrl(recording.audioUrl)
+          : null,
+      insight: isComplete ? recording.insight : null,
+    };
   }
 
   // ─── Pipeline ────────────────────────────────────────────────────────────────
@@ -164,5 +193,49 @@ export class AudioService {
 
   private async setStatus(id: string, status: RecordingStatus): Promise<void> {
     await this.prisma.recording.update({ where: { id }, data: { status } });
+  }
+
+  private getTodayRangeUtc(
+    tzOffsetMinutes = 0,
+    date: Date = new Date(),
+  ): { start: Date; end: Date } {
+    // Shift UTC "now" → local "now" by adding the offset
+    const localNowMs = date.getTime() + tzOffsetMinutes * 60 * 1000;
+    const localNow = new Date(localNowMs);
+
+    // Extract the local date (midnight in local representation)
+    const midnightLocalMs = Date.UTC(
+      localNow.getUTCFullYear(),
+      localNow.getUTCMonth(),
+      localNow.getUTCDate(),
+    );
+
+    // Convert local midnight back to UTC by subtracting the offset
+    const start = new Date(midnightLocalMs - tzOffsetMinutes * 60 * 1000);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    return { start, end };
+  }
+
+  private async findTodayRecording(userId: string, tzOffsetMinutes?: number) {
+    const { start, end } = this.getTodayRangeUtc(tzOffsetMinutes ?? 0);
+    return this.prisma.recording.findFirst({
+      where: {
+        userId,
+        createdAt: {
+          gte: start,
+          lt: end,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        insight: {
+          include: {
+            goalAlignments: {
+              include: { goal: { select: { id: true, title: true } } },
+            },
+          },
+        },
+      },
+    });
   }
 }

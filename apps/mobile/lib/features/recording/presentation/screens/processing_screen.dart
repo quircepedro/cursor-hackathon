@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -33,12 +35,9 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
     final notifier = ref.read(recordingProvider.notifier);
     final currentState = ref.read(recordingProvider);
 
-    // If we already have a recordingId in state (came from TranscriptionReviewScreen),
-    // just continue with the analysis phase.
     if (currentState.recordingId != null) {
       await notifier.continueAnalysis(currentState.recordingId!);
     } else {
-      // Direct flow: extra is an audioPath
       await notifier.stopAndProcess(widget.extra!);
     }
   }
@@ -52,7 +51,10 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
             state.status == RecordingStatus.error)) {
       _navigated = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) context.pushReplacement(RouteNames.result);
+        if (!mounted) return;
+        // Sync todayRecordingProvider so HomeScreen has the latest data
+        unawaited(ref.read(todayRecordingProvider.notifier).refresh());
+        context.pushReplacement(RouteNames.result);
       });
     }
 
