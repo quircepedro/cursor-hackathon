@@ -2,10 +2,14 @@ import { registerAs } from '@nestjs/config';
 
 function parsePrivateKey(raw?: string): string {
   if (!raw) return '';
-  // Strip surrounding quotes if present
   let key = raw.trim();
+  // Strip surrounding quotes if present
   if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
     key = key.slice(1, -1);
+  }
+  // If it doesn't look like a PEM key, assume it's base64-encoded
+  if (!key.startsWith('-----')) {
+    key = Buffer.from(key, 'base64').toString('utf-8');
   }
   // Replace literal \n sequences with real newlines
   key = key.replace(/\\n/g, '\n');
