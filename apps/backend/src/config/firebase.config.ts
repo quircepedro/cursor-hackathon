@@ -9,7 +9,8 @@ function parsePrivateKey(raw?: string): string {
   }
   // If it doesn't look like a PEM key, assume it's base64-encoded
   if (!key.startsWith('-----')) {
-    key = Buffer.from(key, 'base64').toString('utf-8');
+    // Strip any whitespace that may have been introduced during copy-paste
+    key = Buffer.from(key.replace(/\s/g, ''), 'base64').toString('utf-8');
   }
   // Replace literal \n sequences with real newlines
   key = key.replace(/\\n/g, '\n');
