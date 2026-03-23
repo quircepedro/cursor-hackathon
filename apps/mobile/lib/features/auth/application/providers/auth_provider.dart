@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/firebase_auth_repository.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../../recording/application/providers/recording_provider.dart';
 
 // ─── Repository provider ──────────────────────────────────────────────────────
 
@@ -88,6 +89,8 @@ class AuthNotifier extends StreamNotifier<AuthState> {
   }
 
   Future<void> signOut() async {
+    ref.invalidate(todayRecordingProvider);
+    ref.read(recordingProvider.notifier).reset();
     await ref.read(authRepositoryProvider).signOut();
   }
 
