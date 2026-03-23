@@ -1,26 +1,32 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../../../core/services/journal_audio_storage.dart';
 import '../../../../core/services/journal_insight_storage.dart';
 import '../../../goals/domain/entities/goal_alignment_entity.dart';
+import '../../../recording/application/providers/recording_provider.dart';
 import '../../../recording/domain/entities/insight_entity.dart';
+import '../../../recording/domain/entities/recording_entry_entity.dart';
 
 // Height of the sticky glass weekly header
 const _kWeekHeaderHeight = 130.0;
 
-class HistoryScreen extends StatefulWidget {
+class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
 
   @override
-  State<HistoryScreen> createState() => _HistoryScreenState();
+  ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
+class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   final _audioStorage = JournalAudioStorage();
   final _insightStorage = JournalInsightStorage();
+
+  // Remote recordings keyed by date (yyyy-MM-dd)
+  final Map<String, RecordingEntryEntity> _remoteByDate = {};
   final _player = AudioPlayer();
 
   // Monthly view state
@@ -49,6 +55,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _focusedMonth = DateTime(now.year, now.month);
     _focusedWeekStart = _mondayOf(now);
     _loadRecordedDates();
+    _loadRemoteRecordings();
 
     _player.playerStateStream.listen((s) {
       if (!mounted) return;
@@ -86,6 +93,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
   }
 
+  Future<void> _loadRemoteRecordings() async {
+    try {
+      final repo = ref.read(recordingRepositoryProvider);
+      final recordings = await repo.getRecordings();
+      if (!mounted) return;
+      setState(() {
+        for (final r in recordings) {
+          final key = _dateKey(r.date);
+          _remoteByDate[key] = r;
+          final norm = DateTime(r.date.year, r.date.month, r.date.day);
+          _recordedDates.add(norm);
+        }
+      });
+    } catch (_) {
+      // Silent fail — local data still shown
+    }
+  }
+
+  String _dateKey(DateTime d) => '${d.year}-${d.month.toString().padLeft(2,'0')}-${d.day.toString().padLeft(2,'0')}';
+
   Future<void> _selectDate(DateTime date) async {
     final norm = DateTime(date.year, date.month, date.day);
     if (!_recordedDates.contains(norm)) return;
@@ -98,16 +125,29 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     await _player.stop();
 
-    final path = await _audioStorage.getClipPathForDate(date);
+    // Try local file first, then remote stream URL
+    final localPath = await _audioStorage.getClipPathForDate(date);
     bool loaded = false;
-    if (path != null) {
+    if (localPath != null) {
       try {
-        await _player.setFilePath(path);
+        await _player.setFilePath(localPath);
         loaded = true;
       } catch (_) {}
     }
 
-    final insight = await _insightStorage.getForDate(date);
+    if (!loaded) {
+      final remote = _remoteByDate[_dateKey(date)];
+      if (remote?.audioStreamUrl != null) {
+        try {
+          await _player.setUrl(remote!.audioStreamUrl!);
+          loaded = true;
+        } catch (_) {}
+      }
+    }
+
+    // Try local insight first, then remote
+    InsightEntity? insight = await _insightStorage.getForDate(date);
+    insight ??= _remoteByDate[_dateKey(date)]?.insight;
 
     if (!mounted) return;
     setState(() {

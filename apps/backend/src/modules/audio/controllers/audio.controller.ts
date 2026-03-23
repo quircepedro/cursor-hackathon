@@ -18,10 +18,6 @@ import { AudioService } from '../services/audio.service';
 export class AudioController {
   constructor(private readonly audioService: AudioService) {}
 
-  /**
-   * Upload an audio file and trigger the processing pipeline.
-   * Returns immediately with the recording id and initial status.
-   */
   @Post('upload')
   @UseInterceptors(FileInterceptor('audio', { limits: { fileSize: 100 * 1024 * 1024 } }))
   upload(
@@ -31,9 +27,11 @@ export class AudioController {
     return this.audioService.upload(user, file);
   }
 
-  /**
-   * Poll the status and result of a recording.
-   */
+  @Get()
+  getAll(@CurrentUser() user: User) {
+    return this.audioService.getAll(user.id);
+  }
+
   @Get(':id')
   getById(@CurrentUser() user: User, @Param('id') id: string) {
     return this.audioService.getById(user.id, id);

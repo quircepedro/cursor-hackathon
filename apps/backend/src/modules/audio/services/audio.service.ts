@@ -5,6 +5,7 @@ import { PrismaService } from '@database/prisma.service';
 import { TranscriptionService } from '@modules/transcription/services/transcription.service';
 import { AnalysisService } from '@modules/analysis/services/analysis.service';
 import { GoalsService } from '@modules/goals/services/goals.service';
+import { StorageService } from '@modules/storage/storage.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -18,13 +19,13 @@ export class AudioService {
     private readonly transcription: TranscriptionService,
     private readonly analysis: AnalysisService,
     private readonly goalsService: GoalsService,
+    private readonly storage: StorageService,
   ) {}
 
   async upload(
     user: User,
     file: Express.Multer.File,
   ): Promise<{ id: string; status: string }> {
-    // Persist the buffer to a temp file so Whisper can stream it
     const ext = path.extname(file.originalname) || '.m4a';
     const tmpPath = path.join(os.tmpdir(), `votio_${Date.now()}${ext}`);
     fs.writeFileSync(tmpPath, file.buffer);
@@ -35,16 +36,42 @@ export class AudioService {
       data: {
         userId: user.id,
         title: `Journal – ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
-        audioUrl: tmpPath,
+        audioUrl: '',
         duration: 0,
         status: RecordingStatus.UPLOADING,
       },
     });
 
-    // Kick off pipeline without blocking the HTTP response
-    void this.runPipeline(recording.id, tmpPath);
+    void this.runPipeline(recording.id, tmpPath, user.id, ext);
 
     return { id: recording.id, status: recording.status };
+  }
+
+  async getAll(userId: string) {
+    const recordings = await this.prisma.recording.findMany({
+      where: { userId, status: RecordingStatus.COMPLETE },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        insight: {
+          include: {
+            goalAlignments: {
+              include: { goal: { select: { id: true, title: true } } },
+            },
+          },
+        },
+      },
+    });
+
+    return Promise.all(
+      recordings.map(async (r) => ({
+        id: r.id,
+        title: r.title,
+        createdAt: r.createdAt,
+        status: r.status,
+        audioStreamUrl: r.audioUrl ? await this.storage.getSignedUrl(r.audioUrl) : null,
+        insight: r.insight,
+      })),
+    );
   }
 
   async getById(userId: string, recordingId: string) {
@@ -70,27 +97,36 @@ export class AudioService {
 
   // ─── Pipeline ────────────────────────────────────────────────────────────────
 
-  private async runPipeline(recordingId: string, audioPath: string): Promise<void> {
+  private async runPipeline(
+    recordingId: string,
+    audioPath: string,
+    userId: string,
+    ext: string,
+  ): Promise<void> {
     try {
-      // Step 1: Transcribe
+      // Step 1: Upload to R2
+      const s3Key = `audio/${userId}/${recordingId}${ext}`;
+      await this.storage.uploadFile(audioPath, s3Key);
+      await this.prisma.recording.update({
+        where: { id: recordingId },
+        data: { audioUrl: s3Key },
+      });
+
+      // Step 2: Transcribe (client-side — returns empty string)
       await this.setStatus(recordingId, RecordingStatus.TRANSCRIBING);
       const text = await this.transcription.transcribe(audioPath);
       await this.prisma.transcription.create({
         data: { recordingId, text, language: 'auto' },
       });
 
-      // Step 2: Fetch user's goals
-      const recording = await this.prisma.recording.findUnique({
-        where: { id: recordingId },
-        select: { userId: true },
-      });
-      const goals = await this.goalsService.findActive(recording!.userId);
+      // Step 3: Fetch user's goals
+      const goals = await this.goalsService.findActive(userId);
 
-      // Step 3: Analyse with Gemini (emotion + goal alignment)
+      // Step 4: Analyse with Gemini (emotion + goal alignment)
       await this.setStatus(recordingId, RecordingStatus.ANALYZING);
       const result = await this.analysis.analyseJournal(text, goals);
 
-      // Step 4: Save Insight with all parsed fields
+      // Step 5: Save Insight
       const insight = await this.prisma.insight.create({
         data: {
           recordingId,
@@ -102,7 +138,7 @@ export class AudioService {
         },
       });
 
-      // Step 5: Save GoalAlignment records
+      // Step 6: Save GoalAlignment records
       if (goals.length > 0 && result.goalAlignment.goals.length > 0) {
         const alignmentData = result.goalAlignment.goals
           .filter((g) => g.goalIndex >= 0 && g.goalIndex < goals.length)
@@ -110,14 +146,12 @@ export class AudioService {
             insightId: insight.id,
             goalId: goals[g.goalIndex].id,
             score: g.score,
-            level: g.level as any, // AlignmentLevel enum
+            level: g.level as any,
             reason: g.reason,
           }));
-
         await this.prisma.goalAlignment.createMany({ data: alignmentData });
       }
 
-      // Done
       await this.setStatus(recordingId, RecordingStatus.COMPLETE);
       this.logger.log(`Pipeline complete for recording ${recordingId}`);
     } catch (err) {

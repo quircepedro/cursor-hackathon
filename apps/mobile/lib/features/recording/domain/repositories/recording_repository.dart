@@ -1,5 +1,6 @@
 import '../../../goals/domain/entities/goal_entity.dart';
 import '../entities/insight_entity.dart';
+import '../entities/recording_entry_entity.dart';
 
 class RecordingStatusResponse {
   const RecordingStatusResponse({
@@ -21,6 +22,7 @@ class RecordingStatusResponse {
 abstract class RecordingRepository {
   Future<String> uploadAudio(String filePath);
   Future<RecordingStatusResponse> getStatus(String recordingId);
+  Future<List<RecordingEntryEntity>> getRecordings();
 
   /// Analiza el transcript con la IA (emociones + alineación con objetivos).
   Future<InsightEntity> analyseJournal(

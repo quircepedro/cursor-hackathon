@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../goals/domain/entities/goal_entity.dart';
 import '../../domain/entities/insight_entity.dart';
+import '../../domain/entities/recording_entry_entity.dart';
 import '../../domain/repositories/recording_repository.dart';
 
 class ApiRecordingRepository implements RecordingRepository {
@@ -28,6 +29,17 @@ class ApiRecordingRepository implements RecordingRepository {
 
     final body = _unwrap(response.data!);
     return body['id'] as String;
+  }
+
+  @override
+  Future<List<RecordingEntryEntity>> getRecordings() async {
+    final response = await _dio.get<Map<String, dynamic>>('/audio');
+    final raw = response.data!;
+    final List<dynamic> list =
+        raw['data'] is List ? raw['data'] as List<dynamic> : [];
+    return list
+        .map((e) => RecordingEntryEntity.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   @override
