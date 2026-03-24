@@ -317,46 +317,86 @@ final todayRecordingProvider =
 
 // ─── Streak ──────────────────────────────────────────────────────────────────
 
-/// Calculates the current streak: consecutive days with a recording
-/// ending at today (appNow). If today has no recording yet, the streak
-/// counts backwards from yesterday.
-final streakProvider = FutureProvider<int>((ref) async {
-  // Re-compute when today's recording changes (new upload / delete)
+class StreakData {
+  const StreakData({
+    required this.current,
+    required this.best,
+    required this.isCurrentBest,
+    required this.recordedToday,
+    required this.totalDays,
+  });
+
+  final int current;
+  final int best;
+  final bool isCurrentBest;
+  final bool recordedToday;
+  final int totalDays;
+}
+
+/// Calculates current streak, best streak, and whether the current is the best.
+final streakProvider = FutureProvider<StreakData>((ref) async {
   ref.watch(todayRecordingProvider);
   final repo = ref.read(recordingRepositoryProvider);
 
   final recordings = await repo.getRecordings();
-  if (recordings.isEmpty) return 0;
+  if (recordings.isEmpty) {
+    return const StreakData(
+        current: 0, best: 0, isCurrentBest: false, recordedToday: false, totalDays: 0);
+  }
 
-  // Collect unique dates (normalised to midnight)
+  // Unique dates sorted oldest → newest
   final dates = recordings
       .map((r) => DateTime(r.date.year, r.date.month, r.date.day))
       .toSet()
       .toList()
-    ..sort((a, b) => b.compareTo(a)); // newest first
+    ..sort();
 
   final today = appNow();
   final todayNorm = DateTime(today.year, today.month, today.day);
+  final hasToday = dates.contains(todayNorm);
 
-  // Find starting point: today or yesterday
-  DateTime cursor;
-  if (dates.contains(todayNorm)) {
-    cursor = todayNorm;
-  } else {
-    final yesterday = todayNorm.subtract(const Duration(days: 1));
-    if (dates.contains(yesterday)) {
-      cursor = yesterday;
+  // Find ALL streaks to get the best
+  int bestStreak = 1;
+  int run = 1;
+  for (int i = 1; i < dates.length; i++) {
+    final diff = dates[i].difference(dates[i - 1]).inDays;
+    if (diff == 1) {
+      run++;
+      if (run > bestStreak) bestStreak = run;
     } else {
-      return 0;
+      run = 1;
     }
   }
 
-  // Count consecutive days backwards
-  int streak = 0;
-  while (dates.contains(cursor)) {
-    streak++;
+  // Current streak: count backwards from today or yesterday
+  final dateSet = dates.toSet();
+  DateTime cursor;
+  if (dateSet.contains(todayNorm)) {
+    cursor = todayNorm;
+  } else {
+    final yesterday = todayNorm.subtract(const Duration(days: 1));
+    if (dateSet.contains(yesterday)) {
+      cursor = yesterday;
+    } else {
+      return StreakData(
+          current: 0, best: bestStreak, isCurrentBest: false,
+          recordedToday: false, totalDays: dates.length);
+    }
+  }
+
+  int current = 0;
+  while (dateSet.contains(cursor)) {
+    current++;
     cursor = cursor.subtract(const Duration(days: 1));
   }
 
-  return streak;
+  if (current > bestStreak) bestStreak = current;
+
+  return StreakData(
+    current: current,
+    best: bestStreak,
+    isCurrentBest: current >= bestStreak,
+    recordedToday: hasToday,
+    totalDays: dates.length,
+  );
 });
