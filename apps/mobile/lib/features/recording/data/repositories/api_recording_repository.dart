@@ -12,16 +12,21 @@ class ApiRecordingRepository implements RecordingRepository {
   final Dio _dio;
   final int debugOffset;
 
+  /// Real timezone offset (always the same regardless of debug).
+  int get _tzOffsetMinutes => DateTime.now().timeZoneOffset.inMinutes;
+
+  /// When debug offset is active, send the simulated date as ISO string.
+  String? get _referenceDate =>
+      debugOffset != 0 ? appNow().toUtc().toIso8601String() : null;
+
   @override
   Future<String> uploadAudio(String filePath, {String transcript = ''}) async {
     final fileName = filePath.split('/').last;
-    final tzOffsetMinutes = debugOffset != 0
-        ? debugTzOffset(debugOffset)
-        : DateTime.now().timeZoneOffset.inMinutes;
     final formData = FormData.fromMap({
       'audio': await MultipartFile.fromFile(filePath, filename: fileName),
       if (transcript.isNotEmpty) 'transcript': transcript,
-      'tzOffsetMinutes': tzOffsetMinutes.toString(),
+      'tzOffsetMinutes': _tzOffsetMinutes.toString(),
+      if (_referenceDate != null) 'referenceDate': _referenceDate,
     });
 
     final response = await _dio.post<Map<String, dynamic>>(
@@ -51,12 +56,12 @@ class ApiRecordingRepository implements RecordingRepository {
 
   @override
   Future<TodayRecordingResponse?> getTodayRecording() async {
-    final tzOffsetMinutes = debugOffset != 0
-        ? debugTzOffset(debugOffset)
-        : DateTime.now().timeZoneOffset.inMinutes;
     final response = await _dio.get<Map<String, dynamic>>(
       '/audio/today',
-      queryParameters: {'tzOffsetMinutes': tzOffsetMinutes},
+      queryParameters: {
+        'tzOffsetMinutes': _tzOffsetMinutes,
+        if (_referenceDate != null) 'referenceDate': _referenceDate,
+      },
     );
     final raw = response.data!;
     final dynamic data = raw['data'];

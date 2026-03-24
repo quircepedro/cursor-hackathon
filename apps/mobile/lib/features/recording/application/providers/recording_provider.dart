@@ -281,7 +281,8 @@ final recordingRepositoryProvider = Provider<RecordingRepository>((ref) {
 class TodayRecordingNotifier extends AsyncNotifier<TodayRecordingResponse?> {
   @override
   Future<TodayRecordingResponse?> build() async {
-    final repo = ref.read(recordingRepositoryProvider);
+    // watch so that changing debugDateOffsetProvider auto-rebuilds this provider
+    final repo = ref.watch(recordingRepositoryProvider);
     return repo.getTodayRecording();
   }
 

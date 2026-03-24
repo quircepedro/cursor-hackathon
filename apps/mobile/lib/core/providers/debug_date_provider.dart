@@ -17,8 +17,3 @@ DateTime appNow() => DateTime.now().add(Duration(days: _globalOffset));
 DateTime debugNow(int offsetDays) =>
     DateTime.now().add(Duration(days: offsetDays));
 
-/// Fake tzOffsetMinutes so the backend thinks "today" is the shifted day.
-int debugTzOffset(int offsetDays) {
-  final realOffset = DateTime.now().timeZoneOffset.inMinutes;
-  return realOffset - (offsetDays * 1440);
-}

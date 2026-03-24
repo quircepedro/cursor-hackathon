@@ -27,14 +27,17 @@ export class AudioController {
     @UploadedFile() file: Express.Multer.File,
     @Body('transcript') transcript?: string,
     @Body('tzOffsetMinutes') tzOffsetMinutes?: string,
+    @Body('referenceDate') referenceDate?: string,
   ) {
     const parsed =
       tzOffsetMinutes !== undefined ? Number.parseInt(tzOffsetMinutes, 10) : undefined;
+    const refDate = referenceDate ? new Date(referenceDate) : undefined;
     return this.audioService.upload(
       user,
       file,
       transcript,
       Number.isNaN(parsed) ? undefined : parsed,
+      refDate,
     );
   }
 
@@ -47,12 +50,15 @@ export class AudioController {
   getToday(
     @CurrentUser() user: User,
     @Query('tzOffsetMinutes') tzOffsetMinutes?: string,
+    @Query('referenceDate') referenceDate?: string,
   ) {
     const parsedOffset =
       tzOffsetMinutes !== undefined ? Number.parseInt(tzOffsetMinutes, 10) : undefined;
+    const refDate = referenceDate ? new Date(referenceDate) : undefined;
     return this.audioService.getToday(
       user.id,
       Number.isNaN(parsedOffset) ? undefined : parsedOffset,
+      refDate,
     );
   }
 

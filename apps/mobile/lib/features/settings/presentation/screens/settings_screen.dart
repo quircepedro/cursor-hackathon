@@ -94,6 +94,15 @@ class SettingsScreen extends ConsumerWidget {
 }
 
 class _DebugDateTile extends ConsumerWidget {
+  void _applyOffset(WidgetRef ref, int newOffset) {
+    ref.read(debugDateOffsetProvider.notifier).state = newOffset;
+    syncGlobalOffset(newOffset);
+    // Reset in-memory recording state so the home screen doesn't keep old data
+    ref.read(recordingProvider.notifier).reset();
+    // Force re-fetch from server with the new simulated date
+    ref.invalidate(todayRecordingProvider);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final offset = ref.watch(debugDateOffsetProvider);
@@ -111,30 +120,16 @@ class _DebugDateTile extends ConsumerWidget {
         children: [
           IconButton(
             icon: const Icon(Icons.remove_circle_outline, color: Colors.white, size: 20),
-            onPressed: () {
-              final v = offset - 1;
-              ref.read(debugDateOffsetProvider.notifier).state = v;
-              syncGlobalOffset(v);
-              ref.read(todayRecordingProvider.notifier).refresh();
-            },
+            onPressed: () => _applyOffset(ref, offset - 1),
           ),
           if (offset != 0)
             IconButton(
               icon: Icon(Icons.restore, color: Colors.orange[300], size: 20),
-              onPressed: () {
-                ref.read(debugDateOffsetProvider.notifier).state = 0;
-                syncGlobalOffset(0);
-                ref.read(todayRecordingProvider.notifier).refresh();
-              },
+              onPressed: () => _applyOffset(ref, 0),
             ),
           IconButton(
             icon: const Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
-            onPressed: () {
-              final v = offset + 1;
-              ref.read(debugDateOffsetProvider.notifier).state = v;
-              syncGlobalOffset(v);
-              ref.read(todayRecordingProvider.notifier).refresh();
-            },
+            onPressed: () => _applyOffset(ref, offset + 1),
           ),
         ],
       ),

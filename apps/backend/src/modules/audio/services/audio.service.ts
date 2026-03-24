@@ -25,8 +25,9 @@ export class AudioService {
     file: Express.Multer.File,
     clientTranscript?: string,
     tzOffsetMinutes?: number,
+    referenceDate?: Date,
   ): Promise<{ id: string; status: string }> {
-    const existingToday = await this.findTodayRecording(user.id, tzOffsetMinutes);
+    const existingToday = await this.findTodayRecording(user.id, tzOffsetMinutes, referenceDate);
     if (
       existingToday &&
       existingToday.status !== RecordingStatus.FAILED
@@ -103,8 +104,8 @@ export class AudioService {
     return recording;
   }
 
-  async getToday(userId: string, tzOffsetMinutes?: number) {
-    const recording = await this.findTodayRecording(userId, tzOffsetMinutes);
+  async getToday(userId: string, tzOffsetMinutes?: number, referenceDate?: Date) {
+    const recording = await this.findTodayRecording(userId, tzOffsetMinutes, referenceDate);
     if (!recording || recording.status === RecordingStatus.FAILED) {
       return null;
     }
@@ -217,8 +218,8 @@ export class AudioService {
     return { start, end };
   }
 
-  private async findTodayRecording(userId: string, tzOffsetMinutes?: number) {
-    const { start, end } = this.getTodayRangeUtc(tzOffsetMinutes ?? 0);
+  private async findTodayRecording(userId: string, tzOffsetMinutes?: number, referenceDate?: Date) {
+    const { start, end } = this.getTodayRangeUtc(tzOffsetMinutes ?? 0, referenceDate ?? new Date());
     return this.prisma.recording.findFirst({
       where: {
         userId,
