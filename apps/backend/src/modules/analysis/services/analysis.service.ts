@@ -22,10 +22,67 @@ export interface AnalysisResult {
   };
 }
 
+// Fixed emotion taxonomy (Plutchik + common journaling emotions)
+const EMOTION_KEYS = [
+  'joy',
+  'sadness',
+  'anger',
+  'fear',
+  'surprise',
+  'disgust',
+  'anxiety',
+  'calm',
+  'gratitude',
+  'pride',
+  'nostalgia',
+  'frustration',
+] as const;
+
+/**
+ * Normalize emotion scores so they sum to 1.0 and discard noise (< 0.05).
+ * Unknown keys are dropped. If all scores are 0, returns empty map.
+ */
+function normalizeEmotionScores(
+  raw: Record<string, number>,
+): Record<string, number> {
+  // Keep only known keys with positive values
+  const filtered: Record<string, number> = {};
+  for (const key of EMOTION_KEYS) {
+    const val = raw[key];
+    if (typeof val === 'number' && val > 0) {
+      filtered[key] = val;
+    }
+  }
+
+  const sum = Object.values(filtered).reduce((a, b) => a + b, 0);
+  if (sum === 0) return {};
+
+  // Normalize to sum=1 and discard < 0.05
+  const normalized: Record<string, number> = {};
+  for (const [key, val] of Object.entries(filtered)) {
+    const norm = val / sum;
+    if (norm >= 0.05) {
+      normalized[key] = Math.round(norm * 100) / 100; // 2 decimals
+    }
+  }
+
+  // Re-normalize after filtering to ensure sum ≈ 1.0
+  const newSum = Object.values(normalized).reduce((a, b) => a + b, 0);
+  if (newSum > 0 && Math.abs(newSum - 1.0) > 0.01) {
+    for (const key of Object.keys(normalized)) {
+      normalized[key] = Math.round((normalized[key] / newSum) * 100) / 100;
+    }
+  }
+
+  return normalized;
+}
+
 function buildSystemPrompt(goals: Goal[]): string {
   const goalsSection = goals
     .map((g, i) => `  goal_${i}: "${g.title}"`)
     .join('\n');
+
+  const emotionKeysStr = EMOTION_KEYS.join(', ');
 
   return `Eres un analista experto integrado en una app de journaling diario por voz. Tu trabajo es analizar el transcript del usuario y devolver un JSON válido con dos secciones: análisis emocional y alineación con objetivos.
 
@@ -37,7 +94,7 @@ DEBES devolver EXCLUSIVAMENTE un JSON válido con esta estructura exacta (sin ma
 {
   "emotion": {
     "summary": "análisis emocional de 150-250 palabras en prosa continua...",
-    "emotionScores": { "emocion1": 0.0-1.0, "emocion2": 0.0-1.0 },
+    "emotionScores": { ${EMOTION_KEYS.map((k) => `"${k}": 0.0-1.0`).join(', ')} },
     "keyThemes": ["tema1", "tema2"],
     "sentiment": "POSITIVE | NEUTRAL | NEGATIVE"
   },
@@ -62,6 +119,12 @@ REGLAS PARA EL ANÁLISIS EMOCIONAL (campo "summary"):
 - Tono: cálido, inteligente, observador. No clínico, no condescendiente.
 - Basa TODO en el transcript. No inventes ni asumas.
 - No uses listas ni títulos dentro del summary — prosa natural.
+
+REGLAS PARA emotionScores:
+- DEBES usar EXACTAMENTE estas 12 claves: ${emotionKeysStr}.
+- Puntúa cada emoción de 0.0 a 1.0 según su presencia en el transcript.
+- Si una emoción no aplica, ponla en 0.0. No omitas ninguna clave.
+- No inventes otras claves. Solo las 12 listadas.
 
 REGLAS CRÍTICAS PARA ALINEACIÓN CON OBJETIVOS:
 - Analiza CADA objetivo del usuario POR SEPARADO. Devuelve un entry por cada goal_N.
@@ -153,6 +216,14 @@ export class AnalysisService {
 
     try {
       const parsed = JSON.parse(rawText) as AnalysisResult;
+
+      // Normalize emotion scores to fixed taxonomy
+      if (parsed.emotion?.emotionScores) {
+        parsed.emotion.emotionScores = normalizeEmotionScores(
+          parsed.emotion.emotionScores,
+        );
+      }
+
       return parsed;
     } catch (e) {
       this.logger.error('Failed to parse Gemini JSON response', e);
