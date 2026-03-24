@@ -314,3 +314,49 @@ final todayRecordingProvider =
     AsyncNotifierProvider<TodayRecordingNotifier, TodayRecordingResponse?>(
   TodayRecordingNotifier.new,
 );
+
+// ─── Streak ──────────────────────────────────────────────────────────────────
+
+/// Calculates the current streak: consecutive days with a recording
+/// ending at today (appNow). If today has no recording yet, the streak
+/// counts backwards from yesterday.
+final streakProvider = FutureProvider<int>((ref) async {
+  // Re-compute when today's recording changes (new upload / delete)
+  ref.watch(todayRecordingProvider);
+  final repo = ref.read(recordingRepositoryProvider);
+
+  final recordings = await repo.getRecordings();
+  if (recordings.isEmpty) return 0;
+
+  // Collect unique dates (normalised to midnight)
+  final dates = recordings
+      .map((r) => DateTime(r.date.year, r.date.month, r.date.day))
+      .toSet()
+      .toList()
+    ..sort((a, b) => b.compareTo(a)); // newest first
+
+  final today = appNow();
+  final todayNorm = DateTime(today.year, today.month, today.day);
+
+  // Find starting point: today or yesterday
+  DateTime cursor;
+  if (dates.contains(todayNorm)) {
+    cursor = todayNorm;
+  } else {
+    final yesterday = todayNorm.subtract(const Duration(days: 1));
+    if (dates.contains(yesterday)) {
+      cursor = yesterday;
+    } else {
+      return 0;
+    }
+  }
+
+  // Count consecutive days backwards
+  int streak = 0;
+  while (dates.contains(cursor)) {
+    streak++;
+    cursor = cursor.subtract(const Duration(days: 1));
+  }
+
+  return streak;
+});

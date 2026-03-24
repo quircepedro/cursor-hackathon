@@ -145,7 +145,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final hasRecordedToday =
         todayData != null || recordingState.status == RecordingStatus.complete;
     final todayComplete = todayData?.isComplete == true;
-    const streak = 5;
+    final streak = ref.watch(streakProvider).valueOrNull ?? 0;
 
     // Start/stop polling based on recording state
     _startPollingIfNeeded(todayData);
