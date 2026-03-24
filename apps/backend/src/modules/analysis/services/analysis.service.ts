@@ -242,6 +242,7 @@ export class AnalysisService {
     return {
       emotion: {
         summary: 'No se ha podido generar un análisis para esta entrada.',
+        dailySummary: 'No se pudo generar el resumen de hoy.',
         emotionScores: {},
         keyThemes: [],
         sentiment: 'NEUTRAL',
