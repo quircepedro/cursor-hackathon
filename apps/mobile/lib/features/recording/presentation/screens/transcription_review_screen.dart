@@ -21,8 +21,21 @@ class TranscriptionReviewScreen extends ConsumerStatefulWidget {
 
 class _TranscriptionReviewScreenState
     extends ConsumerState<TranscriptionReviewScreen> {
+  late final TextEditingController _controller;
   bool _isAnalysing = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.transcript);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   Future<void> _analyse() async {
     if (_isAnalysing) return;
@@ -37,9 +50,10 @@ class _TranscriptionReviewScreenState
 
       // Upload to backend and continue with server-side processing only.
       final audioPath = await JournalAudioStorage().pathForToday();
+      final editedTranscript = _controller.text.trim();
       final recordingId = await repo.uploadAudio(
         audioPath,
-        transcript: widget.transcript,
+        transcript: editedTranscript,
       );
       if (!mounted) return;
 
@@ -48,7 +62,7 @@ class _TranscriptionReviewScreenState
 
       notifier.setPendingServerAnalysis(
         recordingId: recordingId,
-        transcript: widget.transcript,
+        transcript: editedTranscript,
       );
       context.pushReplacement(RouteNames.processing, extra: recordingId);
     } catch (e) {
@@ -61,7 +75,7 @@ class _TranscriptionReviewScreenState
 
   @override
   Widget build(BuildContext context) {
-    final hasTranscript = widget.transcript.trim().isNotEmpty;
+    final hasTranscript = _controller.text.trim().isNotEmpty;
 
     return Scaffold(
       backgroundColor: const Color(0xFF050505),
@@ -121,7 +135,6 @@ class _TranscriptionReviewScreenState
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Container(
-                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: const Color(0xFF0F0F12),
                     border: Border.all(
@@ -130,27 +143,44 @@ class _TranscriptionReviewScreenState
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: hasTranscript
-                      ? Text(
-                          widget.transcript,
+                      ? TextField(
+                          controller: _controller,
+                          maxLines: null,
+                          keyboardType: TextInputType.multiline,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 17,
                             height: 1.7,
                             fontWeight: FontWeight.w300,
                           ),
-                        )
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.mic_off_outlined,
-                                color: Colors.grey[700], size: 36),
-                            const SizedBox(height: 12),
-                            Text(
-                              'No speech detected',
-                              style: TextStyle(
-                                  color: Colors.grey[600], fontSize: 15),
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.all(20),
+                            border: InputBorder.none,
+                            hintText: 'Edita la transcripción...',
+                            hintStyle: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 17,
+                              fontWeight: FontWeight.w300,
                             ),
-                          ],
+                          ),
+                          cursorColor: const Color(0xFF6366F1),
+                          onChanged: (_) => setState(() {}),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.mic_off_outlined,
+                                  color: Colors.grey[700], size: 36),
+                              const SizedBox(height: 12),
+                              Text(
+                                'No speech detected',
+                                style: TextStyle(
+                                    color: Colors.grey[600], fontSize: 15),
+                              ),
+                            ],
+                          ),
                         ),
                 ),
               ),
