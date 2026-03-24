@@ -579,7 +579,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         if (_selectedInsight != null) ...[
           _buildSentimentBadge(_selectedInsight!),
           const SizedBox(height: 12),
-          _buildSummaryCard(_selectedInsight!),
+          _buildDayAnalysisCard(_selectedInsight!),
           if (_selectedInsight!.keyThemes.isNotEmpty) ...[
             const SizedBox(height: 12),
             _buildThemes(_selectedInsight!.keyThemes),
@@ -711,9 +711,38 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     );
   }
 
-  Widget _buildSummaryCard(InsightEntity insight) {
+  String _shortSummary(String text) {
+    final sentences = text.split(RegExp(r'(?<=[.!?])\s+'));
+    if (sentences.length <= 3) return text;
+    return sentences.take(3).join(' ');
+  }
+
+  int _emotionalScore(InsightEntity insight) {
+    const positive = {'alegría', 'confianza', 'anticipación', 'serenidad', 'interés', 'gratitud'};
+    const negative = {'tristeza', 'ira', 'miedo', 'asco', 'culpa'};
+    double pos = 0, neg = 0;
+    for (final e in insight.emotionScores.entries) {
+      if (positive.contains(e.key)) {
+        pos += e.value;
+      } else if (negative.contains(e.key)) {
+        neg += e.value;
+      }
+    }
+    final total = pos + neg;
+    if (total == 0) return 50;
+    return ((pos / total) * 100).round().clamp(0, 100);
+  }
+
+  Widget _buildDayAnalysisCard(InsightEntity insight) {
+    final score = _emotionalScore(insight);
+    final (scoreColor, scoreLabel) = score >= 70
+        ? (const Color(0xFF34D399), 'Buen equilibrio emocional')
+        : score >= 40
+            ? (const Color(0xFFFBBF24), 'Equilibrio moderado')
+            : (const Color(0xFFEF4444), 'Día emocionalmente intenso');
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: const Color(0xFF151518),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
@@ -723,15 +752,36 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            const Icon(Icons.auto_awesome, color: Color(0xFF6366F1), size: 14),
-            const SizedBox(width: 6),
-            Text('RESUMEN DEL DIA',
-                style: TextStyle(color: Colors.grey[500], fontSize: 10,
-                    fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+            Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.auto_awesome, color: Color(0xFF6366F1), size: 16),
+            ),
+            const SizedBox(width: 10),
+            const Text('Análisis del día', style: TextStyle(
+              color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15)),
           ]),
-          const SizedBox(height: 10),
-          Text(insight.summary,
-              style: TextStyle(color: Colors.grey[300], fontSize: 14, height: 1.6)),
+          const SizedBox(height: 14),
+          Text(_shortSummary(insight.summary),
+              style: TextStyle(color: Colors.grey[400], fontSize: 14, height: 1.65)),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: scoreColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: scoreColor.withValues(alpha: 0.2)),
+            ),
+            child: Row(children: [
+              Icon(Icons.lightbulb_outline, color: scoreColor, size: 16),
+              const SizedBox(width: 8),
+              Expanded(child: Text('$scoreLabel: $score/100',
+                style: TextStyle(color: scoreColor, fontSize: 13, fontWeight: FontWeight.w500))),
+            ]),
+          ),
         ],
       ),
     );

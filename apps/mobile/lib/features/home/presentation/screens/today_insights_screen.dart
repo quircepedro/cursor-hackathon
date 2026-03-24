@@ -113,6 +113,14 @@ class _DayAnalysisCard extends StatelessWidget {
   const _DayAnalysisCard({required this.insight});
   final InsightEntity insight;
 
+  /// Truncate summary to ~2-3 sentences.
+  String _shortSummary() {
+    final text = insight.summary;
+    final sentences = text.split(RegExp(r'(?<=[.!?])\s+'));
+    if (sentences.length <= 3) return text;
+    return sentences.take(3).join(' ');
+  }
+
   /// Compute a simple emotional productivity score (0–100) from emotion scores.
   /// Positive emotions add, negative emotions subtract.
   int _emotionalScore() {
@@ -167,7 +175,7 @@ class _DayAnalysisCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            insight.summary,
+            _shortSummary(),
             style: TextStyle(color: Colors.grey[400], fontSize: 14, height: 1.65),
           ),
           const SizedBox(height: 14),
