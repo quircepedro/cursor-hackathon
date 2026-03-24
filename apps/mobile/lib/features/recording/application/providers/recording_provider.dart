@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/providers/debug_date_provider.dart';
 import '../../../../core/services/journal_insight_storage.dart';
 import '../../../goals/application/providers/goals_provider.dart';
 import '../../data/repositories/api_recording_repository.dart';
@@ -271,7 +272,8 @@ final recordingProvider =
 
 final recordingRepositoryProvider = Provider<RecordingRepository>((ref) {
   final dio = ref.watch(dioProvider);
-  return ApiRecordingRepository(dio);
+  final offset = ref.watch(debugDateOffsetProvider);
+  return ApiRecordingRepository(dio, debugOffset: offset);
 });
 
 // ─── Today Recording (server-based) ─────────────────────────────────────────

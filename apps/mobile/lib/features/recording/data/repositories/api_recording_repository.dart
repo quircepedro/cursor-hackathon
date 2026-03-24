@@ -1,19 +1,23 @@
 import 'package:dio/dio.dart';
 
+import '../../../../core/providers/debug_date_provider.dart';
 import '../../../goals/domain/entities/goal_entity.dart';
 import '../../domain/entities/insight_entity.dart';
 import '../../domain/entities/recording_entry_entity.dart';
 import '../../domain/repositories/recording_repository.dart';
 
 class ApiRecordingRepository implements RecordingRepository {
-  const ApiRecordingRepository(this._dio);
+  const ApiRecordingRepository(this._dio, {this.debugOffset = 0});
 
   final Dio _dio;
+  final int debugOffset;
 
   @override
   Future<String> uploadAudio(String filePath, {String transcript = ''}) async {
     final fileName = filePath.split('/').last;
-    final tzOffsetMinutes = DateTime.now().timeZoneOffset.inMinutes;
+    final tzOffsetMinutes = debugOffset != 0
+        ? debugTzOffset(debugOffset)
+        : DateTime.now().timeZoneOffset.inMinutes;
     final formData = FormData.fromMap({
       'audio': await MultipartFile.fromFile(filePath, filename: fileName),
       if (transcript.isNotEmpty) 'transcript': transcript,
@@ -47,7 +51,9 @@ class ApiRecordingRepository implements RecordingRepository {
 
   @override
   Future<TodayRecordingResponse?> getTodayRecording() async {
-    final tzOffsetMinutes = DateTime.now().timeZoneOffset.inMinutes;
+    final tzOffsetMinutes = debugOffset != 0
+        ? debugTzOffset(debugOffset)
+        : DateTime.now().timeZoneOffset.inMinutes;
     final response = await _dio.get<Map<String, dynamic>>(
       '/audio/today',
       queryParameters: {'tzOffsetMinutes': tzOffsetMinutes},
