@@ -71,6 +71,22 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     _player.durationStream.listen((d) {
       if (mounted && d != null) setState(() => _duration = d);
     });
+
+    // Reload calendar data when today's recording changes (delete, new upload, date change)
+    ref.listenManual(todayRecordingProvider, (_, __) => _reloadAll());
+  }
+
+  void _reloadAll() {
+    _player.stop();
+    _remoteByDate.clear();
+    setState(() {
+      _selectedDate = null;
+      _selectedInsight = null;
+      _clipLoaded = false;
+      _loading = true;
+    });
+    _loadRecordedDates();
+    _loadRemoteRecordings();
   }
 
   @override
