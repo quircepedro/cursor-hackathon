@@ -41,13 +41,15 @@ export class AudioService {
 
     this.logger.log(`Audio saved to ${tmpPath} (${file.size} bytes)`);
 
+    const effectiveDate = referenceDate ?? new Date();
     const recording = await this.prisma.recording.create({
       data: {
         userId: user.id,
-        title: `Journal – ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+        title: `Journal – ${effectiveDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
         audioUrl: '',
         duration: 0,
         status: RecordingStatus.UPLOADING,
+        ...(referenceDate ? { createdAt: referenceDate } : {}),
       },
     });
 
