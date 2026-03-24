@@ -1,3 +1,4 @@
+import '../../../../core/providers/debug_date_provider.dart';
 import 'dart:convert';
 import 'dart:math';
 
@@ -21,7 +22,7 @@ class LocalGoalsRepository implements GoalsRepository {
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
   String _newGoalId() =>
-      'local_${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(1 << 30)}';
+      'local_${appNow().microsecondsSinceEpoch}_${Random().nextInt(1 << 30)}';
 
   Future<List<GoalEntity>> _readGoals() async {
     final raw = (await _prefs).getString(_kGoals);
@@ -111,7 +112,7 @@ class LocalGoalsRepository implements GoalsRepository {
   @override
   Future<List<AlignmentHistoryEntry>> getAlignmentHistory({int days = 30}) async {
     final all = await _readHistory();
-    final cutoff = DateTime.now().subtract(Duration(days: days));
+    final cutoff = appNow().subtract(Duration(days: days));
     return all.where((e) => !e.date.isBefore(cutoff)).toList();
   }
 

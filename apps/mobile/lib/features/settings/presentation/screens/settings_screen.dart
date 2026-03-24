@@ -112,7 +112,9 @@ class _DebugDateTile extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.remove_circle_outline, color: Colors.white, size: 20),
             onPressed: () {
-              ref.read(debugDateOffsetProvider.notifier).state = offset - 1;
+              final v = offset - 1;
+              ref.read(debugDateOffsetProvider.notifier).state = v;
+              syncGlobalOffset(v);
               ref.read(todayRecordingProvider.notifier).refresh();
             },
           ),
@@ -121,13 +123,16 @@ class _DebugDateTile extends ConsumerWidget {
               icon: Icon(Icons.restore, color: Colors.orange[300], size: 20),
               onPressed: () {
                 ref.read(debugDateOffsetProvider.notifier).state = 0;
+                syncGlobalOffset(0);
                 ref.read(todayRecordingProvider.notifier).refresh();
               },
             ),
           IconButton(
             icon: const Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
             onPressed: () {
-              ref.read(debugDateOffsetProvider.notifier).state = offset + 1;
+              final v = offset + 1;
+              ref.read(debugDateOffsetProvider.notifier).state = v;
+              syncGlobalOffset(v);
               ref.read(todayRecordingProvider.notifier).refresh();
             },
           ),

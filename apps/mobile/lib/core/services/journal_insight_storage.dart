@@ -1,3 +1,4 @@
+import '../../../core/providers/debug_date_provider.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -29,7 +30,7 @@ class JournalInsightStorage {
 
   /// Saves an insight for today. Overwrites if one already exists.
   Future<void> saveToday(InsightEntity insight) async {
-    final path = await _pathForDate(DateTime.now());
+    final path = await _pathForDate(appNow());
     final json = jsonEncode(insight.toJson());
     await File(path).writeAsString(json);
   }

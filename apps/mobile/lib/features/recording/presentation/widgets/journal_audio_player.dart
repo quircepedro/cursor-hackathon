@@ -1,3 +1,4 @@
+import '../../../../core/providers/debug_date_provider.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -8,10 +9,11 @@ import '../../../../core/services/journal_audio_storage.dart';
 /// Compact audio player for today's journal clip.
 /// Shows play/pause button, progress bar, and duration.
 class JournalAudioPlayer extends StatefulWidget {
-  const JournalAudioPlayer({super.key, this.date});
+  const JournalAudioPlayer({super.key, this.date, this.audioUrl});
 
   /// Date of the clip to play. Defaults to today.
   final DateTime? date;
+  final String? audioUrl;
 
   @override
   State<JournalAudioPlayer> createState() => _JournalAudioPlayerState();
@@ -31,7 +33,20 @@ class _JournalAudioPlayerState extends State<JournalAudioPlayer> {
   }
 
   Future<void> _loadClip() async {
-    final date = widget.date ?? DateTime.now();
+    if (widget.audioUrl != null && widget.audioUrl!.isNotEmpty) {
+      try {
+        await _player.setUrl(widget.audioUrl!);
+        setState(() {
+          _hasClip = true;
+          _loading = false;
+        });
+      } catch (_) {
+        setState(() => _loading = false);
+      }
+      return;
+    }
+
+    final date = widget.date ?? appNow();
     final path = await _storage.getClipPathForDate(date);
     if (!mounted) return;
     if (path != null) {
@@ -44,9 +59,9 @@ class _JournalAudioPlayerState extends State<JournalAudioPlayer> {
       } catch (_) {
         setState(() => _loading = false);
       }
-    } else {
-      setState(() => _loading = false);
+      return;
     }
+    setState(() => _loading = false);
   }
 
   @override

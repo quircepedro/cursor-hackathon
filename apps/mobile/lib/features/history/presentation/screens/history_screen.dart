@@ -1,3 +1,4 @@
+import '../../../../core/providers/debug_date_provider.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -51,7 +52,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
+    final now = appNow();
     _focusedMonth = DateTime(now.year, now.month);
     _focusedWeekStart = _mondayOf(now);
     _loadRecordedDates();
@@ -176,7 +177,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
-  bool _isToday(DateTime d) => _isSameDay(d, DateTime.now());
+  bool _isToday(DateTime d) => _isSameDay(d, appNow());
 
   DateTime _mondayOf(DateTime d) => d.subtract(Duration(days: d.weekday - 1));
 

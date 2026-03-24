@@ -14,7 +14,8 @@ class MockAuthRepository extends Mock implements AuthRepository {}
 
 const _testConfig = AppConfig(
   environment: AppEnvironment.development,
-  apiBaseUrl: 'http://localhost:3000/api/v1',
+  apiBaseUrl: '',
+  geminiApiKey: 'test-gemini-key',
   apiTimeoutMs: 30000,
   analyticsEnabled: false,
   crashReportingEnabled: false,

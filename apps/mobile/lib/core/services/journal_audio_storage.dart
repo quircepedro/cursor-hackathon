@@ -1,3 +1,4 @@
+import '../../../core/providers/debug_date_provider.dart';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
@@ -28,7 +29,7 @@ class JournalAudioStorage {
   }
 
   /// Returns the file path for today's audio clip.
-  Future<String> pathForToday() => pathForDate(DateTime.now());
+  Future<String> pathForToday() => pathForDate(appNow());
 
   /// Saves an audio file as today's journal clip.
   /// If a clip already exists for today, it is overwritten.
@@ -49,7 +50,7 @@ class JournalAudioStorage {
   }
 
   /// Returns true if today's clip already exists.
-  Future<bool> hasTodayClip() => hasClipForDate(DateTime.now());
+  Future<bool> hasTodayClip() => hasClipForDate(appNow());
 
   /// Returns the file path for today's clip, or null if it doesn't exist.
   Future<String?> getTodayClipPath() async {

@@ -1,20 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Global date override for testing. When set, the app behaves as if
-/// "today" is [DateTime.now() + offsetDays].
-/// Affects tzOffsetMinutes sent to the backend so it resolves the
-/// overridden day as "today".
+/// Global date override for testing.
 final debugDateOffsetProvider = StateProvider<int>((ref) => 0);
 
-/// Returns the effective "now" considering the debug offset.
+/// Singleton offset accessible without ref (for non-widget code).
+int _globalOffset = 0;
+
+/// Call this whenever debugDateOffsetProvider changes.
+void syncGlobalOffset(int offset) => _globalOffset = offset;
+
+/// Drop-in replacement for DateTime.now() across the entire app.
+/// When offset is 0, returns real now. Otherwise shifts by N days.
+DateTime appNow() => DateTime.now().add(Duration(days: _globalOffset));
+
+/// Returns the effective "now" considering a given offset.
 DateTime debugNow(int offsetDays) =>
     DateTime.now().add(Duration(days: offsetDays));
 
-/// Returns a fake tzOffsetMinutes that tricks the backend into thinking
-/// "today" is [offsetDays] days from real today.
+/// Fake tzOffsetMinutes so the backend thinks "today" is the shifted day.
 int debugTzOffset(int offsetDays) {
   final realOffset = DateTime.now().timeZoneOffset.inMinutes;
-  // Each day = 1440 minutes. We shift the tz offset so the backend
-  // computes "today" = real_today + offsetDays.
   return realOffset - (offsetDays * 1440);
 }

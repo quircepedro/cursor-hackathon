@@ -1,3 +1,4 @@
+import '../../../../core/providers/debug_date_provider.dart';
 import '../../../goals/domain/entities/alignment_history_entity.dart';
 import '../../../goals/domain/entities/goal_alignment_entity.dart';
 import '../../../goals/domain/entities/goal_entity.dart';
@@ -33,7 +34,7 @@ class InsightEntity {
 
     final overall = overallAlignment != null ? norm(overallAlignment!) : 0.0;
     return AlignmentHistoryEntry(
-      date: DateTime.now(),
+      date: appNow(),
       overallScore: overall,
       goals: [
         for (final a in goalAlignments)
