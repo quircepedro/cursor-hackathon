@@ -12,6 +12,7 @@ export interface GoalAlignmentResult {
 export interface AnalysisResult {
   emotion: {
     summary: string;
+    dailySummary: string;
     emotionScores: Record<string, number>;
     keyThemes: string[];
     sentiment: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
@@ -94,6 +95,7 @@ DEBES devolver EXCLUSIVAMENTE un JSON válido con esta estructura exacta (sin ma
 {
   "emotion": {
     "summary": "análisis emocional de 150-250 palabras en prosa continua...",
+    "dailySummary": "resumen conciso de 2-3 frases del día",
     "emotionScores": { ${EMOTION_KEYS.map((k) => `"${k}": 0.0-1.0`).join(', ')} },
     "keyThemes": ["tema1", "tema2"],
     "sentiment": "POSITIVE | NEUTRAL | NEGATIVE"
@@ -110,6 +112,11 @@ DEBES devolver EXCLUSIVAMENTE un JSON válido con esta estructura exacta (sin ma
     ]
   }
 }
+
+REGLAS PARA dailySummary:
+- Exactamente 2-3 frases. Tono directo y personal ("Hoy fue un día de...").
+- Captura la esencia del día en pocas palabras, sin repetir el summary.
+- Sin tecnicismos, como si se lo contaras a un amigo.
 
 REGLAS PARA EL ANÁLISIS EMOCIONAL (campo "summary"):
 - MÍNIMO 150 palabras, MÁXIMO 250 palabras, en 2-3 párrafos de prosa continua.

@@ -100,6 +100,7 @@ model Insight {
   recording Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
 
   summary        String
+  dailySummary   String? // 2-3 sentence concise daily summary
   emotionScores  Json // { joy: 0.8, sadness: 0.2, anger: 0.1, ... }
   keyThemes      Json // ["theme1", "theme2", ...]
   suggestedActions Json? // [{ action: "...", priority: "high" }, ...]

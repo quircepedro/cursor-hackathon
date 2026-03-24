@@ -160,6 +160,7 @@ export class AudioService {
         data: {
           recordingId,
           summary: result.emotion.summary,
+          dailySummary: result.emotion.dailySummary ?? null,
           emotionScores: result.emotion.emotionScores,
           keyThemes: result.emotion.keyThemes,
           sentiment: result.emotion.sentiment,

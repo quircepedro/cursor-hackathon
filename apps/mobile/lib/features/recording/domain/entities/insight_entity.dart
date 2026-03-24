@@ -5,6 +5,7 @@ import '../../../goals/domain/entities/goal_entity.dart';
 class InsightEntity {
   const InsightEntity({
     required this.summary,
+    this.dailySummary,
     required this.emotionScores,
     required this.keyThemes,
     required this.sentiment,
@@ -14,6 +15,7 @@ class InsightEntity {
   });
 
   final String summary;
+  final String? dailySummary;
   final Map<String, double> emotionScores;
   final List<String> keyThemes;
   final String sentiment; // POSITIVE | NEUTRAL | NEGATIVE
@@ -46,6 +48,7 @@ class InsightEntity {
 
   Map<String, dynamic> toJson() => {
         'summary': summary,
+        if (dailySummary != null) 'dailySummary': dailySummary,
         'emotionScores': emotionScores,
         'keyThemes': keyThemes,
         'sentiment': sentiment,
@@ -70,6 +73,7 @@ class InsightEntity {
 
     return InsightEntity(
       summary: json['summary'] as String? ?? '',
+      dailySummary: json['dailySummary'] as String?,
       emotionScores: rawScores.map(
         (k, v) => MapEntry(k, (v as num).toDouble()),
       ),
@@ -115,6 +119,7 @@ class InsightEntity {
 
     return InsightEntity(
       summary: emotion['summary'] as String? ?? '',
+      dailySummary: emotion['dailySummary'] as String?,
       emotionScores: rawScores.map(
         (k, v) => MapEntry(k, (v as num).toDouble()),
       ),

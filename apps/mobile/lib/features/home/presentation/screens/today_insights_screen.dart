@@ -71,6 +71,11 @@ class TodayInsightsScreen extends ConsumerWidget {
           EmotionDailyWidget(insight: insight),
           const SizedBox(height: 16),
 
+          if (insight.dailySummary != null) ...[
+            _DailySummaryCard(dailySummary: insight.dailySummary!),
+            const SizedBox(height: 12),
+          ],
+
           _SummaryCard(insight: insight),
           const SizedBox(height: 12),
 
@@ -274,3 +279,58 @@ class _AlignmentSection extends StatelessWidget {
   }
 }
 
+
+class _DailySummaryCard extends StatelessWidget {
+  const _DailySummaryCard({required this.dailySummary});
+  final String dailySummary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D0D12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.auto_awesome, color: Color(0xFF6366F1), size: 14),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'RESUMEN DEL DÍA',
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.4,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            dailySummary,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              height: 1.6,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
