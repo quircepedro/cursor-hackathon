@@ -124,6 +124,23 @@ export class AudioService {
     };
   }
 
+  async deleteToday(userId: string, tzOffsetMinutes?: number, referenceDate?: Date) {
+    const recording = await this.findTodayRecording(userId, tzOffsetMinutes, referenceDate);
+    if (!recording) return { deleted: false };
+
+    // Delete R2 object if it exists
+    if (recording.audioUrl) {
+      await this.storage.deleteFile(recording.audioUrl).catch((err) => {
+        this.logger.warn(`Failed to delete R2 object ${recording.audioUrl}: ${err}`);
+      });
+    }
+
+    // Cascade deletes Transcription, Insight, GoalAlignment, Clip
+    await this.prisma.recording.delete({ where: { id: recording.id } });
+    this.logger.log(`Deleted today's recording ${recording.id} for user ${userId}`);
+    return { deleted: true, id: recording.id };
+  }
+
   // ─── Pipeline ────────────────────────────────────────────────────────────────
 
   private async runPipeline(

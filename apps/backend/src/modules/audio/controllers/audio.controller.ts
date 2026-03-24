@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Post,
   Param,
@@ -56,6 +57,22 @@ export class AudioController {
       tzOffsetMinutes !== undefined ? Number.parseInt(tzOffsetMinutes, 10) : undefined;
     const refDate = referenceDate ? new Date(referenceDate) : undefined;
     return this.audioService.getToday(
+      user.id,
+      Number.isNaN(parsedOffset) ? undefined : parsedOffset,
+      refDate,
+    );
+  }
+
+  @Delete('today')
+  deleteToday(
+    @CurrentUser() user: User,
+    @Query('tzOffsetMinutes') tzOffsetMinutes?: string,
+    @Query('referenceDate') referenceDate?: string,
+  ) {
+    const parsedOffset =
+      tzOffsetMinutes !== undefined ? Number.parseInt(tzOffsetMinutes, 10) : undefined;
+    const refDate = referenceDate ? new Date(referenceDate) : undefined;
+    return this.audioService.deleteToday(
       user.id,
       Number.isNaN(parsedOffset) ? undefined : parsedOffset,
       refDate,

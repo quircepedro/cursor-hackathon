@@ -108,6 +108,19 @@ class ApiRecordingRepository implements RecordingRepository {
     return InsightEntity.fromAnalysisApi(body, goals: goals);
   }
 
+  @override
+  Future<bool> deleteTodayRecording() async {
+    final response = await _dio.delete<Map<String, dynamic>>(
+      '/audio/today',
+      queryParameters: {
+        'tzOffsetMinutes': _tzOffsetMinutes,
+        if (_referenceDate != null) 'referenceDate': _referenceDate,
+      },
+    );
+    final body = _unwrap(response.data!);
+    return body['deleted'] == true;
+  }
+
   // The backend wraps responses in { success: true, data: { ... } }
   Map<String, dynamic> _unwrap(Map<String, dynamic> response) {
     if (response.containsKey('data') && response['data'] is Map) {

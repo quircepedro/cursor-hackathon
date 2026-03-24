@@ -46,4 +46,7 @@ abstract class RecordingRepository {
     String transcript, {
     required List<GoalEntity> goals,
   });
+
+  /// Borra la grabación del día actual (respetando debug offset).
+  Future<bool> deleteTodayRecording();
 }

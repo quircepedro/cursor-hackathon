@@ -43,6 +43,13 @@ class JournalAudioStorage {
     return dest;
   }
 
+  /// Deletes the audio clip for a given date.
+  Future<void> deleteForDate(DateTime date) async {
+    final path = await pathForDate(date);
+    final file = File(path);
+    if (await file.exists()) await file.delete();
+  }
+
   /// Returns true if a clip exists for the given date.
   Future<bool> hasClipForDate(DateTime date) async {
     final path = await pathForDate(date);

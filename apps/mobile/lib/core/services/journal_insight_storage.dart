@@ -48,6 +48,13 @@ class JournalInsightStorage {
     }
   }
 
+  /// Deletes the insight file for a given date.
+  Future<void> deleteForDate(DateTime date) async {
+    final path = await _pathForDate(date);
+    final file = File(path);
+    if (await file.exists()) await file.delete();
+  }
+
   /// Returns all dates that have saved insights (sorted descending).
   Future<List<DateTime>> getAllDates() async {
     final dir = await _insightDir();

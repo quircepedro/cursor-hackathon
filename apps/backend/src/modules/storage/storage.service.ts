@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as fs from 'fs';
 
@@ -33,6 +33,13 @@ export class StorageService {
     );
     this.logger.log(`Uploaded ${key} to R2 (${body.length} bytes)`);
     return key;
+  }
+
+  async deleteFile(key: string): Promise<void> {
+    await this.s3.send(
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+    this.logger.log(`Deleted ${key} from R2`);
   }
 
   async getSignedUrl(key: string, expiresIn = 3600): Promise<string> {
