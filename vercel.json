@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "echo \"skip npm install\"",
-  "buildCommand": "if [ -f scripts/vercel-build-flutter-web.sh ]; then bash scripts/vercel-build-flutter-web.sh; elif [ -f ../scripts/vercel-build-flutter-web.sh ]; then bash ../scripts/vercel-build-flutter-web.sh; elif [ -f ../../scripts/vercel-build-flutter-web.sh ]; then bash ../../scripts/vercel-build-flutter-web.sh; else echo \"Could not locate scripts/vercel-build-flutter-web.sh\" && pwd && ls -la && exit 127; fi",
+  "buildCommand": "npm run vercel:build",
   "outputDirectory": "apps/mobile/build/web",
   "rewrites": [
     {
