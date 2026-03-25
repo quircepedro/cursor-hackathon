@@ -5,5 +5,7 @@ npx lint-staged
 
 # Run Flutter analysis if Flutter packages exist
 if [ -d "apps/mobile" ]; then
+  # Ensure pub global executables (melos) are on PATH
+  export PATH="$PATH:$HOME/.pub-cache/bin"
   melos run analyze --no-select || true
 fi
