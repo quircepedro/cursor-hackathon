@@ -64,7 +64,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         .animate(curve);
     _exitFade = Tween<double>(begin: 1, end: 0).animate(curve);
 
-    _refreshToday();
+    // Defer provider modification to after the build phase completes.
+    Future(_refreshToday);
   }
 
   @override
@@ -74,7 +75,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         _exitController.value > 0) {
       _exitController.reverse();
     }
-    _refreshToday();
+    Future(_refreshToday);
   }
 
   @override

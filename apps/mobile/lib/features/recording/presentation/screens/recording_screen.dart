@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter_sound/flutter_sound.dart';
 import 'package:go_router/go_router.dart';
 import 'package:record/record.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -30,7 +32,8 @@ class _RecordingScreenState extends State<RecordingScreen>
   late final AnimationController _colorController;
 
   final _speech = SpeechToText();
-  final _audioRecorder = AudioRecorder();
+  final _audioRecorder = AudioRecorder(); // used on iOS
+  FlutterSoundRecorder? _soundRecorder;   // used on Android (doNotRequestFocus)
   final _audioStorage = JournalAudioStorage();
   bool _speechAvailable = false;
   bool _isRecording = false;
@@ -72,6 +75,12 @@ class _RecordingScreenState extends State<RecordingScreen>
       duration: const Duration(seconds: 4),
     );
     _initSpeech();
+    if (Platform.isAndroid) _initAndroidRecorder();
+  }
+
+  Future<void> _initAndroidRecorder() async {
+    _soundRecorder = FlutterSoundRecorder();
+    await _soundRecorder!.openRecorder();
   }
 
   Future<void> _initSpeech() async {
@@ -184,6 +193,7 @@ class _RecordingScreenState extends State<RecordingScreen>
     _colorController.dispose();
     _speech.cancel();
     _audioRecorder.dispose();
+    unawaited(_soundRecorder?.closeRecorder());
     super.dispose();
   }
 
@@ -226,26 +236,37 @@ class _RecordingScreenState extends State<RecordingScreen>
     });
     _colorController.repeat(reverse: true);
 
-    // Start speech-to-text FIRST so it claims the mic before AudioRecorder.
-    await _startListening();
-
-    // Start audio file recording after speech is listening.
-    // Use voiceRecognition audio source so Android allows concurrent capture
-    // alongside SpeechRecognizer (MediaRecorder.AudioSource.VOICE_RECOGNITION).
     final tempPath = await _audioStorage.pathForToday();
-    if (await _audioRecorder.hasPermission()) {
-      await _audioRecorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.aacLc,
-          bitRate: 128000,
-          androidConfig: AndroidRecordConfig(
-            audioSource: AndroidAudioSource.voiceRecognition,
-            useLegacy: true,
-          ),
-        ),
-        path: tempPath,
+
+    if (Platform.isAndroid) {
+      // On Android, the `record` package calls requestAudioFocus() which sends
+      // AUDIOFOCUS_LOSS_TRANSIENT to SpeechRecognizer, killing transcription.
+      // flutter_sound v9 does NOT request audio focus — SpeechRecognizer keeps
+      // its session and the microphone is shared via VOICE_RECOGNITION source.
+      if (_soundRecorder == null) {
+        _soundRecorder = FlutterSoundRecorder();
+        await _soundRecorder!.openRecorder();
+      }
+      await _soundRecorder!.startRecorder(
+        toFile: tempPath,
+        codec: Codec.aacMP4,
+        bitRate: 128000,
+        audioSource: AudioSource.voice_recognition,
       );
+    } else {
+      // iOS: concurrent audio sessions work fine with record package.
+      if (await _audioRecorder.hasPermission()) {
+        await _audioRecorder.start(
+          const RecordConfig(
+            encoder: AudioEncoder.aacLc,
+            bitRate: 128000,
+          ),
+          path: tempPath,
+        );
+      }
     }
+
+    await _startListening();
   }
 
   Future<void> _stop() async {
@@ -261,9 +282,15 @@ class _RecordingScreenState extends State<RecordingScreen>
     });
     await _speech.stop();
 
-    // Stop audio file recording — file is already saved at the today path
-    if (await _audioRecorder.isRecording()) {
-      await _audioRecorder.stop();
+    // Stop audio file recording
+    if (Platform.isAndroid) {
+      if (_soundRecorder?.isRecording ?? false) {
+        await _soundRecorder!.stopRecorder();
+      }
+    } else {
+      if (await _audioRecorder.isRecording()) {
+        await _audioRecorder.stop();
+      }
     }
 
     if (!mounted) return;
