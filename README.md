@@ -308,6 +308,16 @@ apps/mobile/build/web
 
 La configuración de Vercel está en `vercel.json` y sirve la SPA de Flutter con fallback a `index.html`.
 
+### Opción recomendada: que Vercel compile Flutter Web
+
+En Vercel, configura:
+
+- **Framework Preset**: Other
+- **Build Command**: `npm run vercel:build`
+- **Output Directory**: `apps/mobile/build/web`
+
+Esto usa `scripts/vercel-build-flutter-web.sh`, que descarga Flutter (Linux) en el build y ejecuta `flutter build web --release`.
+
 ### Prerrequisitos
 
 - Backend desplegado externamente (Railway/Render/etc.) y accesible por HTTPS

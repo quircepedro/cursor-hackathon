@@ -28,7 +28,8 @@
     "check-env": "bash scripts/check-env.sh",
     "mobile:web:build": "cd \"apps/mobile\" && flutter build web --release",
     "mobile:web:build:prod": "cd \"apps/mobile\" && flutter build web --release --dart-define=APP_ENV=production",
-    "mobile:web:serve": "cd \"apps/mobile\" && flutter run -d chrome --dart-define=APP_ENV=development"
+    "mobile:web:serve": "cd \"apps/mobile\" && flutter run -d chrome --dart-define=APP_ENV=development",
+    "vercel:build": "bash scripts/vercel-build-flutter-web.sh"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",
