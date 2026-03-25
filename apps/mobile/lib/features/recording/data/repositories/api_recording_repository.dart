@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:http/http.dart' as http;
 
 import '../../../../core/providers/debug_date_provider.dart';
 import '../../../goals/domain/entities/goal_entity.dart';
@@ -20,10 +21,24 @@ class ApiRecordingRepository implements RecordingRepository {
       debugOffset != 0 ? appNow().toUtc().toIso8601String() : null;
 
   @override
-  Future<String> uploadAudio(String filePath, {String transcript = ''}) async {
-    final fileName = filePath.split('/').last;
+  Future<String> uploadAudio(
+    String filePath, {
+    String transcript = '',
+    List<int>? fileBytes,
+    String? fileName,
+  }) async {
+    final defaultFileName = filePath.split('/').last;
+    final bytes = fileBytes ?? await _maybeReadBytesFromWebBlob(filePath);
     final formData = FormData.fromMap({
-      'audio': await MultipartFile.fromFile(filePath, filename: fileName),
+      'audio': bytes != null
+          ? MultipartFile.fromBytes(
+              bytes,
+              filename: fileName ?? defaultFileName,
+            )
+          : await MultipartFile.fromFile(
+              filePath,
+              filename: fileName ?? defaultFileName,
+            ),
       if (transcript.isNotEmpty) 'transcript': transcript,
       'tzOffsetMinutes': _tzOffsetMinutes.toString(),
       if (_referenceDate != null) 'referenceDate': _referenceDate,
@@ -127,5 +142,15 @@ class ApiRecordingRepository implements RecordingRepository {
       return response['data'] as Map<String, dynamic>;
     }
     return response;
+  }
+
+  Future<List<int>?> _maybeReadBytesFromWebBlob(String path) async {
+    // On web, record can return "blob:*" URLs that must be uploaded as bytes.
+    if (!path.startsWith('blob:')) return null;
+    final response = await http.get(Uri.parse(path));
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.bodyBytes;
+    }
+    throw StateError('No se pudo leer el audio temporal del navegador');
   }
 }

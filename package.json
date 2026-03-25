@@ -25,7 +25,10 @@
     "db:seed": "npm run prisma:seed --workspace=apps/backend",
     "type-check": "tsc --noEmit --skipLibCheck -p apps/backend/tsconfig.json",
     "clean": "bash scripts/clean.sh",
-    "check-env": "bash scripts/check-env.sh"
+    "check-env": "bash scripts/check-env.sh",
+    "mobile:web:build": "cd \"apps/mobile\" && flutter build web --release",
+    "mobile:web:build:prod": "cd \"apps/mobile\" && flutter build web --release --dart-define=APP_ENV=production",
+    "mobile:web:serve": "cd \"apps/mobile\" && flutter run -d chrome --dart-define=APP_ENV=development"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",

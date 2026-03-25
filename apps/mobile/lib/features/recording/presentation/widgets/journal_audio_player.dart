@@ -51,7 +51,11 @@ class _JournalAudioPlayerState extends State<JournalAudioPlayer> {
     if (!mounted) return;
     if (path != null) {
       try {
-        await _player.setFilePath(path);
+        if (JournalAudioStorage.canSetAsUrl(path)) {
+          await _player.setUrl(path);
+        } else {
+          await _player.setFilePath(path);
+        }
         setState(() {
           _hasClip = true;
           _loading = false;

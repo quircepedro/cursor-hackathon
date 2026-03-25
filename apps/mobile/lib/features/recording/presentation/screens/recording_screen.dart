@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:record/record.dart';
@@ -32,7 +32,7 @@ class _RecordingScreenState extends State<RecordingScreen>
   late final AnimationController _colorController;
 
   final _speech = SpeechToText();
-  final _audioRecorder = AudioRecorder();       // iOS
+  final _audioRecorder = AudioRecorder();
   final _silentRecorder = SilentAudioRecorder(); // Android (no audio focus)
   final _audioStorage = JournalAudioStorage();
   bool _speechAvailable = false;
@@ -138,6 +138,9 @@ class _RecordingScreenState extends State<RecordingScreen>
     return null;
   }
 
+  bool get _isAndroidNative =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
   void _onSoundLevel(double level) {
     if (!mounted) return;
     // iOS: roughly -2 to 10 dB, Android: 0 to ~30 dB
@@ -230,8 +233,7 @@ class _RecordingScreenState extends State<RecordingScreen>
     _colorController.repeat(reverse: true);
 
     final tempPath = await _audioStorage.pathForToday();
-
-    if (Platform.isAndroid) {
+    if (_isAndroidNative) {
       // On Android the `record` package calls requestAudioFocus() which sends
       // AUDIOFOCUS_LOSS_TRANSIENT to SpeechRecognizer, killing transcription.
       // SilentAudioRecorder uses AudioRecord + MediaCodec directly without
@@ -266,11 +268,14 @@ class _RecordingScreenState extends State<RecordingScreen>
     await _speech.stop();
 
     // Stop audio file recording
-    if (Platform.isAndroid) {
+    if (_isAndroidNative) {
       await _silentRecorder.stop();
     } else {
       if (await _audioRecorder.isRecording()) {
-        await _audioRecorder.stop();
+        final recordedPath = await _audioRecorder.stop();
+        if (kIsWeb && recordedPath != null && recordedPath.isNotEmpty) {
+          await _audioStorage.saveToday(recordedPath);
+        }
       }
     }
 

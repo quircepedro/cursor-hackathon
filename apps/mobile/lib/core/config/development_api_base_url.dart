@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -202,6 +203,14 @@ Future<String> _replaceLoopbackOnPhysicalIos(String url) async {
 /// **Android físico / iPhone físico** con `127.0.0.1`: intenta `--dart-define=VOTIO_LAN_HOST=`
 /// o **descubre** en la Wi‑Fi un host con puerto 3000 abierto (Nest) y lo guarda 7 días.
 Future<String> resolveDevelopmentApiBaseUrlAsync() async {
+  const fromDefine = String.fromEnvironment('API_BASE_URL', defaultValue: '');
+  final fromEnv = dotenv.env['API_BASE_URL']?.trim();
+  if (kIsWeb) {
+    if (fromDefine.isNotEmpty) return fromDefine;
+    if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
+    return 'http://localhost:3000/api/v1';
+  }
+
   AndroidDeviceInfo? android;
 
   Future<AndroidDeviceInfo> loadAndroid() async {
@@ -211,11 +220,9 @@ Future<String> resolveDevelopmentApiBaseUrlAsync() async {
 
   late String resolved;
 
-  const fromDefine = String.fromEnvironment('API_BASE_URL', defaultValue: '');
   if (fromDefine.isNotEmpty) {
     resolved = fromDefine;
   } else {
-    final fromEnv = dotenv.env['API_BASE_URL']?.trim();
     if (fromEnv != null && fromEnv.isNotEmpty) {
       resolved = fromEnv;
     } else {

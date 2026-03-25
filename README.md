@@ -290,6 +290,71 @@ flutter pub get
 melos run build_runner
 ```
 
+### 6. Build Web App (Flutter Web)
+
+```bash
+cd apps/mobile
+flutter pub get
+flutter build web --release --dart-define=APP_ENV=production
+```
+
+Output folder:
+
+```bash
+apps/mobile/build/web
+```
+
+## Deploy Web on Vercel
+
+La configuración de Vercel está en `vercel.json` y sirve la SPA de Flutter con fallback a `index.html`.
+
+### Prerrequisitos
+
+- Backend desplegado externamente (Railway/Render/etc.) y accesible por HTTPS
+- Proyecto Vercel vinculado al repositorio
+- Variables de entorno de Firebase Web disponibles
+
+### Variables requeridas para build web
+
+Pásalas como `--dart-define` en build local/CI:
+
+```bash
+APP_ENV=production
+FIREBASE_WEB_API_KEY=...
+FIREBASE_WEB_APP_ID=...
+FIREBASE_WEB_MESSAGING_SENDER_ID=...
+FIREBASE_WEB_PROJECT_ID=...
+FIREBASE_WEB_AUTH_DOMAIN=...
+FIREBASE_WEB_STORAGE_BUCKET=...
+FIREBASE_WEB_MEASUREMENT_ID=...
+GOOGLE_WEB_CLIENT_ID=...
+GOOGLE_SERVER_CLIENT_ID=...
+API_BASE_URL=https://tu-backend.tu-dominio.com/api/v1
+```
+
+### Build local + deploy prebuilt a Vercel
+
+```bash
+cd apps/mobile
+flutter build web --release \
+  --dart-define=APP_ENV=production \
+  --dart-define=API_BASE_URL=https://tu-backend.tu-dominio.com/api/v1 \
+  --dart-define=FIREBASE_WEB_API_KEY=... \
+  --dart-define=FIREBASE_WEB_APP_ID=... \
+  --dart-define=FIREBASE_WEB_MESSAGING_SENDER_ID=... \
+  --dart-define=FIREBASE_WEB_PROJECT_ID=... \
+  --dart-define=FIREBASE_WEB_AUTH_DOMAIN=... \
+  --dart-define=FIREBASE_WEB_STORAGE_BUCKET=... \
+  --dart-define=FIREBASE_WEB_MEASUREMENT_ID=... \
+  --dart-define=GOOGLE_WEB_CLIENT_ID=... \
+  --dart-define=GOOGLE_SERVER_CLIENT_ID=...
+
+cd ../..
+vercel deploy --prebuilt --prod
+```
+
+Nota: para Google Sign-In en web, agrega tu dominio de Vercel en Firebase Authentication (Authorized domains).
+
 **Verify analyze passes:**
 
 ```bash

@@ -36,7 +36,12 @@ class TodayRecordingResponse {
 }
 
 abstract class RecordingRepository {
-  Future<String> uploadAudio(String filePath, {String transcript});
+  Future<String> uploadAudio(
+    String filePath, {
+    String transcript,
+    List<int>? fileBytes,
+    String? fileName,
+  });
   Future<RecordingStatusResponse> getStatus(String recordingId);
   Future<List<RecordingEntryEntity>> getRecordings();
   Future<TodayRecordingResponse?> getTodayRecording();

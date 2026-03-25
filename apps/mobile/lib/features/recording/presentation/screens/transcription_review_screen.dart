@@ -49,7 +49,10 @@ class _TranscriptionReviewScreenState
       final notifier = ref.read(recordingProvider.notifier);
 
       // Upload to backend and continue with server-side processing only.
-      final audioPath = await JournalAudioStorage().pathForToday();
+      final audioPath = await JournalAudioStorage().getTodayClipPath();
+      if (audioPath == null || audioPath.isEmpty) {
+        throw StateError('No hay audio disponible para subir');
+      }
       final editedTranscript = _controller.text.trim();
       final recordingId = await repo.uploadAudio(
         audioPath,

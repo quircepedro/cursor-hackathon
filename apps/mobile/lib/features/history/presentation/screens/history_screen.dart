@@ -147,7 +147,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     bool loaded = false;
     if (localPath != null) {
       try {
-        await _player.setFilePath(localPath);
+        if (JournalAudioStorage.canSetAsUrl(localPath)) {
+          await _player.setUrl(localPath);
+        } else {
+          await _player.setFilePath(localPath);
+        }
         loaded = true;
       } catch (_) {}
     }
