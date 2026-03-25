@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../../../app/router/route_names.dart';
 import '../../../../core/services/journal_audio_storage.dart';
+import '../../../../core/services/silent_audio_recorder.dart';
 
 class RecordingScreen extends StatefulWidget {
   const RecordingScreen({
@@ -30,7 +32,8 @@ class _RecordingScreenState extends State<RecordingScreen>
   late final AnimationController _colorController;
 
   final _speech = SpeechToText();
-  final _audioRecorder = AudioRecorder();
+  final _audioRecorder = AudioRecorder();       // iOS
+  final _silentRecorder = SilentAudioRecorder(); // Android (no audio focus)
   final _audioStorage = JournalAudioStorage();
   bool _speechAvailable = false;
   bool _isRecording = false;
@@ -226,20 +229,27 @@ class _RecordingScreenState extends State<RecordingScreen>
     });
     _colorController.repeat(reverse: true);
 
-    // Start speech recognition first so it claims audio priority,
-    // then start the audio file recorder.
-    await _startListening();
-
     final tempPath = await _audioStorage.pathForToday();
-    if (await _audioRecorder.hasPermission()) {
-      await _audioRecorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.aacLc,
-          bitRate: 128000,
-        ),
-        path: tempPath,
-      );
+
+    if (Platform.isAndroid) {
+      // On Android the `record` package calls requestAudioFocus() which sends
+      // AUDIOFOCUS_LOSS_TRANSIENT to SpeechRecognizer, killing transcription.
+      // SilentAudioRecorder uses AudioRecord + MediaCodec directly without
+      // requesting audio focus, so both can share the microphone.
+      await _silentRecorder.start(tempPath);
+    } else {
+      if (await _audioRecorder.hasPermission()) {
+        await _audioRecorder.start(
+          const RecordConfig(
+            encoder: AudioEncoder.aacLc,
+            bitRate: 128000,
+          ),
+          path: tempPath,
+        );
+      }
     }
+
+    await _startListening();
   }
 
   Future<void> _stop() async {
@@ -256,8 +266,12 @@ class _RecordingScreenState extends State<RecordingScreen>
     await _speech.stop();
 
     // Stop audio file recording
-    if (await _audioRecorder.isRecording()) {
-      await _audioRecorder.stop();
+    if (Platform.isAndroid) {
+      await _silentRecorder.stop();
+    } else {
+      if (await _audioRecorder.isRecording()) {
+        await _audioRecorder.stop();
+      }
     }
 
     if (!mounted) return;
