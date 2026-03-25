@@ -142,13 +142,17 @@ class SilentAudioRecorder(flutterEngine: FlutterEngine) :
             val bytesRead = audioRecord?.read(pcmBuffer, 0, pcmBuffer.size) ?: -1
             if (bytesRead <= 0) continue
 
-            // Feed to encoder
-            val inputIndex = encoder?.dequeueInputBuffer(10_000) ?: -1
-            if (inputIndex >= 0) {
+            // Feed to encoder in chunks that fit the input buffer
+            var offset = 0
+            while (offset < bytesRead) {
+                val inputIndex = encoder?.dequeueInputBuffer(10_000) ?: -1
+                if (inputIndex < 0) break
                 val inputBuffer = encoder!!.getInputBuffer(inputIndex)!!
                 inputBuffer.clear()
-                inputBuffer.put(pcmBuffer, 0, bytesRead)
-                encoder!!.queueInputBuffer(inputIndex, 0, bytesRead, 0, 0)
+                val chunkSize = minOf(bytesRead - offset, inputBuffer.remaining())
+                inputBuffer.put(pcmBuffer, offset, chunkSize)
+                encoder!!.queueInputBuffer(inputIndex, 0, chunkSize, 0, 0)
+                offset += chunkSize
             }
 
             // Drain encoded output
